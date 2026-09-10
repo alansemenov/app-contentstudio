@@ -221,7 +221,8 @@ Behaviour:
   "project") matches against project display names and ids from `$projects`, calls `selectProject` without
   opening the dialog and answers with the project's display name.
 - "Create a new <type> [called <name>] [under <parent>]" — verbs "create", "make", "add", each followed by
-  "a"/"an"/"new"; clauses "called|named|titled <name>" and "under|inside|in|below <parent>" in either order.
+  "a"/"an"/"new"; clauses "called|named|titled <name>" and "under|inside|below <parent>" in either order ("in" is not a
+  parent word so names like "life in the city" stay intact).
   - Parent: the named content when given (looked up with `findContentByName`; ambiguous or missing parent
     answers with the parent phrases and creates nothing), else the single selected item, else the project root.
   - Type: the content types the New Content dialog would show for that parent via

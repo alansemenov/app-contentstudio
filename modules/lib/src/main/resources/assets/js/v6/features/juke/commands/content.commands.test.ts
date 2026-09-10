@@ -86,7 +86,8 @@ describe('parseCreate', () => {
         ['create a new blog called summer news', { typeName: 'blog', displayName: 'summer news' }],
         ['create a new blog named summer news', { typeName: 'blog', displayName: 'summer news' }],
         ['create a new article under superhero', { typeName: 'article', parentName: 'superhero' }],
-        ['create a new article in the news folder', { typeName: 'article', parentName: 'the news folder' }],
+        ['create a new article inside the news folder', { typeName: 'article', parentName: 'the news folder' }],
+        ['create a new blog called life in the city', { typeName: 'blog', displayName: 'life in the city' }],
         [
             'create a new blog called summer news under superhero',
             { typeName: 'blog', displayName: 'summer news', parentName: 'superhero' },

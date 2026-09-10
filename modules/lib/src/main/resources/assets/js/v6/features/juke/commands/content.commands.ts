@@ -31,7 +31,7 @@ export type CreateArgs = {
 
 const CREATE_PREFIX = /^(?:create|make|add)\s+(?:(?:a|an)\s+(?:new\s+)?|new\s+)(.+)$/;
 const NAME_CLAUSE = /\s+(?:called|named|titled)\s+/;
-const PARENT_CLAUSE = /\s+(?:under|inside|in|below)\s+/;
+const PARENT_CLAUSE = /\s+(?:under|inside|below)\s+/;
 
 // Splits "<type> called <name> under <parent>" (either clause order) into parts.
 function splitClauses(rest: string): CreateArgs {
