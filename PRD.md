@@ -146,23 +146,55 @@ replaces the dialog confirmation step.
 
 ## 5. Milestones and acceptance criteria
 
-### Milestone 1 — Voice session
+### Milestone 1 — Voice session (done, commits `322a99a`..`5e3d7c2` on `juke-voice`)
 
-Phrases (`phrases.properties`):
-- `juke.reply.hello=Hello, {0}. What can I help you with today?`
-- `juke.reply.goodbye=Goodbye, {0}. See you next time.`
+Phrases (`phrases.properties`). Greetings carry no comma before the name: speech synthesis turns a comma into
+an audible pause.
+- `juke.reply.hello=Hello {0}. What can I help you with today?`
+- `juke.reply.goodbye=Goodbye {0}. See you next time.`
 - `juke.reply.unknown=I'm not sure how to respond to this command. Please try again.`
+- `juke.notify.micDenied=Juke cannot hear you: microphone access is blocked for this site.`
+- `juke.widget.listening` / `juke.widget.speaking` (aria labels of the widget)
+- Small talk (dialog mode only), each with the user's name as `{0}`:
+  `juke.reply.smalltalk.howAreYou`, `.help`, `.capabilities`, `.whoAreYou`, `.thanks`, `.niceToMeetYou`,
+  `.goodMorning`, `.goodAfternoon`, `.goodEvening`, `.greeting`
 
-Acceptance:
-- With operator running and a supported browser, the microphone starts on browse page load (permission prompt
-  shown once). Without operator: no microphone access, no icon, no code runs beyond the availability check.
-- "Hello, Juke" shows the Juke icon bottom-right and speaks the hello reply with the user's display name.
-- While listening in dialog mode the icon uses the "breathe" animation; while speaking it shows the "bars"
-  equalizer pill (see Decisions). Both respect `prefers-reduced-motion`.
-- "Goodbye, Juke" speaks the goodbye reply, then hides the icon and returns to idle listening.
-- Any other phrase in dialog mode gets the unknown reply. Phrases in idle mode are ignored.
-- Unit tests for normalization, wake/sleep matching, state transitions, and recognizer restart logic with a
-  mocked `SpeechRecognition`.
+Behaviour:
+- Availability: `$config.aiEnabled && $config.browseMode` and Web Speech API present. Otherwise no microphone
+  access, no icon, and the service stays off.
+- With the operator running and a supported browser, the microphone starts on browse page load (permission
+  prompt shown once). If access is denied, Juke turns off and shows one lib-admin-ui warning.
+- Idle mode listens for the wake phrase only. Accepted: "hello|hey|hi" + "juke|jukes|duke|jook|jude|jules|juno".
+  Everything else is ignored silently.
+- "Hello, Juke" switches to dialog mode, shows the icon bottom-right and speaks the hello reply with the user's
+  display name. Saying it again in dialog mode greets again.
+- In dialog mode a leading address is stripped before matching ("hey juke, how are you" → "how are you";
+  "juke, select all" → "select all"), so a command spoken together with the name reaches the command. A bare
+  wake phrase is left intact.
+- Small talk in dialog mode: how are you, help requests ("I'd like some help with Content Studio", "can you help
+  me"), what can you do, who are you, thanks, nice to meet you, good morning/afternoon/evening, bare hello.
+  The capabilities reply lists the M2–M4 features ahead of their delivery.
+- "Goodbye, Juke" (also "bye juke", "see you juke") speaks the goodbye reply, then hides the icon and returns to
+  idle listening. Session commands win over small talk and over any pending prompt.
+- Any other phrase in dialog mode gets the unknown reply.
+- Replies are spoken one at a time through a queue. Recognition is paused while speaking and resumed 300 ms
+  after the utterance ends, so Juke never transcribes itself.
+- Voice: "Google UK English Male", falling back to the first `en-GB` voice, then the first `en` voice. Rate and
+  pitch 1.0. Utterances resolve on `end`, `error`, or a safety timeout of max(3 s, 120 ms per character).
+- Recognizer: continuous, final results only, 3 alternatives, `en-US`. Restarts on every `end` while active;
+  backs off 1 s → 10 s after `network`/`audio-capture` errors, resets after a result; stops for good on
+  `not-allowed`/`service-not-allowed`. Later alternatives are tried when the first does not match a command.
+- Widget: 64 px Juke icon fixed bottom-right, mounted in `BrowseAppShell`, appears with a fade/zoom. Listening:
+  "breathe" (scale 1→1.06 with a green glow and faint ring, 2.6 s loop). Speaking: "bars" equalizer pill left of
+  the icon, icon bobs. Glow is deep green on light theme and pale mint on dark. Both respect
+  `prefers-reduced-motion`. Keyframes and utilities live in `assets/styles/tailwind.css`.
+
+Tests (88, `features/juke/**/*.test.ts`): normalization; wake, sleep and address patterns; session and small
+talk commands through the registry; recognizer start/restart/back-off/pause/resume/denied with a fake
+`SpeechRecognition`; voice picking and speaker resolution; service state machine end to end with injected
+recognizer and speaker.
+
+Not verified manually yet: needs an XP with the Juke Operator running and `hackathon.jar` deployed (see §8).
 
 ### Milestone 2 — Projects and content creation
 
