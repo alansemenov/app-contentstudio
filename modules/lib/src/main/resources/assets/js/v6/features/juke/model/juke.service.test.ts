@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Principal } from '@enonic/lib-admin-ui/security/Principal';
 import { $config } from '../../../shared/config/config.store';
-import { clearCommands } from '../commands/command.registry';
+import { clearCommands, registerCommands } from '../commands/command.registry';
 import type { Recognizer, RecognizerHandlers } from '../speech/recognizer';
 import type { Speaker } from '../speech/speaker';
 import { start, stop } from './juke.service';
@@ -212,6 +212,28 @@ describe('juke.service', () => {
         await hear('hey juke, how are you?');
 
         expect(speeches[0].text).toBe('juke.reply.smalltalk.howAreYou|Alan');
+    });
+
+    it('speaks a failure reply when a command throws instead of falling silent', async () => {
+        start({ createRecognizer, createSpeaker });
+        registerCommands({
+            id: 'test.boom',
+            modes: ['dialog'],
+            match: (text) => (text === 'explode' ? true : null),
+            run: () => Promise.reject(new Error('boom')),
+        });
+        makeAvailable();
+
+        await hear('hello juke');
+        await finishSpeaking();
+
+        await hear('explode');
+
+        expect(speeches[0].text).toBe('juke.reply.failed');
+        await finishSpeaking();
+
+        await hear('goodbye juke');
+        expect(speeches[0].text).toBe('juke.reply.goodbye|Alan');
     });
 
     it('uses later alternatives when the first one is misheard', async () => {

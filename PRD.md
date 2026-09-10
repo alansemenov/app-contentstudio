@@ -178,7 +178,9 @@ Behaviour:
   idle listening. Session commands win over small talk and over any pending prompt.
 - Any other phrase in dialog mode gets the unknown reply.
 - Replies are spoken one at a time through a queue. Recognition is paused while speaking and resumed 300 ms
-  after the utterance ends, so Juke never transcribes itself.
+  after the utterance ends, so Juke never transcribes itself. A command that throws or takes longer than 20 s
+  gets `juke.reply.failed` spoken and logged, so Juke never falls silent. Every recognized phrase and the
+  resolved command id are logged with `console.info('[juke] heard', ...)` for diagnosis.
 - Voice: "Google UK English Male", falling back to the first `en-GB` voice, then the first `en` voice. Rate and
   pitch 1.0. Utterances resolve on `end`, `error`, or a safety timeout of max(3 s, 120 ms per character).
 - Recognizer: continuous, final results only, 3 alternatives, `en-US`. Restarts on every `end` while active;

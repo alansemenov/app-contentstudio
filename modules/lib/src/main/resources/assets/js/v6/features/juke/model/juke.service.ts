@@ -48,6 +48,25 @@ let deps: Required<JukeServiceDeps> = {
 // Replies are spoken one after another, never interleaved.
 let queue: Promise<void> = Promise.resolve();
 
+// A command that neither answers nor fails within this time is treated as failed,
+// so Juke never falls silent with the queue blocked behind it.
+export const COMMAND_TIMEOUT_MS = 20_000;
+
+const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`command timed out after ${ms} ms`)), ms);
+        promise.then(
+            (value) => {
+                clearTimeout(timer);
+                resolve(value);
+            },
+            (error) => {
+                clearTimeout(timer);
+                reject(error);
+            },
+        );
+    });
+
 const enqueue = (task: () => Promise<void>): void => {
     queue = queue.then(task).catch((error) => {
         console.error('[juke] command failed', error);
@@ -85,6 +104,13 @@ const handleTranscripts = (alternatives: string[]): void => {
 
     const candidates = context.mode === 'dialog' ? normalized.map(stripJukeAddress) : normalized;
     const resolved = resolveCommand(candidates, context);
+    console.info(
+        '[juke] heard',
+        JSON.stringify(candidates[0]),
+        '->',
+        resolved?.command.id ?? 'no command',
+        context.mode,
+    );
     if (resolved == null) {
         if (context.mode === 'dialog') {
             enqueue(() => respond({ say: i18n('juke.reply.unknown') }));
@@ -93,7 +119,16 @@ const handleTranscripts = (alternatives: string[]): void => {
     }
 
     enqueue(async () => {
-        const reply = await resolved.command.run(resolved.args, context);
+        let reply: JukeReply | null;
+        try {
+            reply = await withTimeout(
+                Promise.resolve(resolved.command.run(resolved.args, context)),
+                COMMAND_TIMEOUT_MS,
+            );
+        } catch (error) {
+            console.error(`[juke] command ${resolved.command.id} failed`, error);
+            reply = { say: i18n('juke.reply.failed') };
+        }
         if (reply != null) {
             await respond(reply);
         }
