@@ -21,7 +21,7 @@ public final class ContentIconUrlResolver
 {
     private static final String ICON_SCALE = "square(128)";
 
-    private static final String ADMIN_TOOL_BASE_URL = "/admin/com.enonic.app.contentstudio/main";
+    private static final String ADMIN_TOOL_BASE_URL = "/admin/com.enonic.app.hackathon/main";
 
     private final ContentTypeIconUrlResolver contentTypeIconUrlResolver;
 

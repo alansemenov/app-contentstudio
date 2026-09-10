@@ -36,7 +36,7 @@ describe('fetchLocales', () => {
         const result = await fetchLocales();
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/content/locales');
+        expect(url).toContain('/rest-v2/hackathon/content/locales');
         expect(url).not.toContain('?');
         expect(init.method).toBe('GET');
         expect(result.isOk()).toBe(true);

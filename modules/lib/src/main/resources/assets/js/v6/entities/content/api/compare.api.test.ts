@@ -30,7 +30,7 @@ describe('compareContent', () => {
         const result = await compareContent(['a', 'b']);
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/compare');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/compare');
         expect(init.method).toBe('POST');
         expect(JSON.parse(init.body)).toEqual({ ids: ['a', 'b'] });
 

@@ -46,7 +46,7 @@ describe('listContentByParent', () => {
         });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/list?');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/list?');
         expect(url).toContain('parentId=p-1');
         expect(url).toContain('expand=1');
         expect(url).toContain('from=0');
@@ -93,7 +93,7 @@ describe('queryContent', () => {
         const result = await queryContent({ queryExpr: "fulltext('displayName', 'x', 'AND')", from: 0, size: 10 });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/query');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/query');
         expect(init.method).toBe('POST');
 
         const body = JSON.parse(init.body);
@@ -112,9 +112,7 @@ describe('queryContent', () => {
     });
 
     it('should query the given branch when one is provided', async () => {
-        mockFetch.mockResolvedValue(
-            jsonResponse({ contents: [], metadata: { totalHits: 0 }, aggregations: [] }),
-        );
+        mockFetch.mockResolvedValue(jsonResponse({ contents: [], metadata: { totalHits: 0 }, aggregations: [] }));
 
         await queryContent({ queryExpr: '', from: 0, size: 10, branch: 'master' });
 
@@ -140,7 +138,7 @@ describe('fetchReadOnlyContentIds', () => {
         const result = await fetchReadOnlyContentIds([contentId('a'), contentId('b')]);
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/isReadOnlyContent');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/isReadOnlyContent');
         expect(init).toMatchObject({
             method: 'POST',
             body: JSON.stringify({ contentIds: ['a', 'b'] }),
@@ -163,7 +161,7 @@ describe('listContentIdsByParent', () => {
         const result = await listContentIdsByParent({ parentId: contentId('p-1'), childOrder: makeOrder() });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/listIds?');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/listIds?');
         expect(url).toContain('parentId=p-1');
         expect(url).toContain('childOrder=_modifiedTime+DESC');
         expect(init.method).toBe('GET');

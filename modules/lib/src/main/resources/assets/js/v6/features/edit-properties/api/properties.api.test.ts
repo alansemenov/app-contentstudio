@@ -27,7 +27,7 @@ describe('updateContentMetadata', () => {
         const result = await updateContentMetadata(contentId('c-1'), PrincipalKey.fromString('user:system:su'));
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/updateMetadata');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/updateMetadata');
         expect(init).toMatchObject({
             method: 'POST',
             body: JSON.stringify({ contentId: 'c-1', owner: 'user:system:su' }),
@@ -62,7 +62,7 @@ describe('updateContentLanguage', () => {
         const result = await updateContentLanguage(contentId('c-1'), 'no');
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/updateLanguage');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/updateLanguage');
         expect(init).toMatchObject({
             method: 'POST',
             body: JSON.stringify({ contentId: 'c-1', language: 'no' }),

@@ -31,7 +31,7 @@ public final class AdminCmsRestActivator
     @Reference
     public void setService( final JaxRsServiceFactory factory )
     {
-        this.service = factory.newService( "v2cs", ResourceConstants.REST_ROOT, DispatchConstants.XP_CONNECTOR );
+        this.service = factory.newService( "v2hackathon", ResourceConstants.REST_ROOT, DispatchConstants.XP_CONNECTOR );
         this.service.add( new CmsResourceDynamicFeature() );
     }
 }

@@ -44,7 +44,7 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 @Path(ResourceConstants.REST_ROOT + "schema/content")
 @Produces("application/json")
 @RolesAllowed({RoleKeys.ADMIN_LOGIN_ID, RoleKeys.ADMIN_ID})
-@Component(immediate = true, property = "group=v2cs")
+@Component(immediate = true, property = "group=v2hackathon")
 public final class ContentTypeResource
     implements JaxRsComponent
 {

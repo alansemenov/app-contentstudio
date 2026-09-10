@@ -141,7 +141,7 @@ public final class LiveEditInjection
     {
         final Map<String, String> map = Maps.newHashMap();
         final AssetUrlParams params = new AssetUrlParams();
-        params.application( "com.enonic.app.contentstudio" );
+        params.application( "com.enonic.app.hackathon" );
         map.put( "assetsUrl", portalUrlService.assetUrl( params ) );
         map.put( "project", resolveProject( portalRequest ) );
         return map;

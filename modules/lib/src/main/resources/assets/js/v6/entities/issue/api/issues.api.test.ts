@@ -60,7 +60,7 @@ describe('listIssues', () => {
         const result = await listIssues({ from: 0, size: 50 });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/issue/list');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/issue/list');
         expect(init.method).toBe('POST');
 
         const body = JSON.parse(init.body);
@@ -102,7 +102,7 @@ describe('createIssue', () => {
         });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/issue/create');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/issue/create');
 
         const body = JSON.parse(init.body);
         expect(Object.keys(body)).toEqual(['title', 'description', 'approvers', 'publishRequest', 'schedule']);
@@ -149,7 +149,7 @@ describe('fetchIssue', () => {
         const result = await fetchIssue('iss-1');
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/issue/id?id=iss-1');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/issue/id?id=iss-1');
         expect(init.method).toBe('GET');
         expect(result.isOk()).toBe(true);
         expect(result._unsafeUnwrap()).toEqual({ issueFrom: { id: 'iss-1' } });
@@ -180,7 +180,7 @@ describe('updateIssue', () => {
         });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/issue/update');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/issue/update');
 
         const body = JSON.parse(init.body);
         expect(Object.keys(body)).toEqual([
@@ -238,7 +238,7 @@ describe('listIssueComments', () => {
         const result = await listIssueComments('iss-1');
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/issue/comment/list');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/issue/comment/list');
 
         const body = JSON.parse(init.body);
         expect(body).toEqual({ issue: 'iss-1', from: 0, size: 150 });
@@ -261,7 +261,7 @@ describe('createIssueComment', () => {
         });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/issue/comment');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/issue/comment');
         expect(url).not.toContain('comment/list');
 
         expect(JSON.parse(init.body)).toEqual({ issue: 'iss-1', text: 'hello', creator: 'user:system:su' });
@@ -277,7 +277,7 @@ describe('updateIssueComment', () => {
         const result = await updateIssueComment({ commentId: 'c-1', text: 'edited' });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/issue/comment/update');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/issue/comment/update');
         expect(JSON.parse(init.body)).toEqual({ comment: 'c-1', text: 'edited' });
         expect(result.isOk()).toBe(true);
     });
@@ -290,7 +290,7 @@ describe('deleteIssueComment', () => {
         const result = await deleteIssueComment('c-1');
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/issue/comment/delete');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/issue/comment/delete');
         expect(JSON.parse(init.body)).toEqual({ comment: 'c-1' });
         expect(result._unsafeUnwrap()).toBe(true);
     });

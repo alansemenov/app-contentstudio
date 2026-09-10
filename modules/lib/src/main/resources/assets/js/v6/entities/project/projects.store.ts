@@ -13,6 +13,7 @@ import {
 import { isWizardUrl } from '../../shared/lib/url/app';
 import { listProjects } from './api/projects.api';
 import { $activeProject, setActiveProject } from './activeProject.store';
+import { $config } from '../../shared/config/config.store';
 
 // TODO: Enonic UI - Feature: store projects as JSON objects in the sync store
 // TODO: Enonic UI - Feature: load projects from the sync store on startup if other tabs are active
@@ -53,7 +54,7 @@ export const $noProjectMode = computed($projects, (store) => {
     return !store.projects.some(isAvailableProject);
 });
 
-export const $hasMultipleProjects = computed($projects, ({projects}) => projects.length > 1);
+export const $hasMultipleProjects = computed($projects, ({ projects }) => projects.length > 1);
 
 //
 // * Internal writer: applies an id to $projects map AND publishes the
@@ -89,7 +90,7 @@ function isAvailableProject(project: Readonly<Project> | undefined): boolean {
 const APP_ID = 'com.enonic.app.contentstudio';
 
 function getProjectIdFromUrl(): string | undefined {
-    const viewPath = window.location.href.split(APP_ID)[1];
+    const viewPath = window.location.href.split($config.get().appId || APP_ID)[1];
     const normalizedPath = viewPath?.replace(/\/[^\/]+/, '') || '/';
     return normalizedPath.split('/')[1];
 }

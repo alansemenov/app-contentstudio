@@ -47,7 +47,7 @@ describe('listProjects', () => {
         const result = await listProjects();
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/project/list?resolveUnavailable=true');
+        expect(url).toContain('/rest-v2/hackathon/project/list?resolveUnavailable=true');
         expect(url).not.toContain('/cms/');
         expect(init.method).toBe('GET');
         expect(result.isOk()).toBe(true);
@@ -79,7 +79,7 @@ describe('createProject', () => {
         });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/project/create');
+        expect(url).toContain('/rest-v2/hackathon/project/create');
         expect(init.method).toBe('POST');
 
         const body = JSON.parse(init.body);
@@ -123,7 +123,7 @@ describe('updateProject', () => {
         });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/project/modify');
+        expect(url).toContain('/rest-v2/hackathon/project/modify');
         const body = JSON.parse(init.body);
         expect(Object.keys(body)).toEqual(['name', 'displayName', 'description', 'language', 'applicationConfigs']);
         expect(result.isOk()).toBe(true);
@@ -139,7 +139,7 @@ describe('updateProjectPermissions', () => {
         ]);
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/project/modifyPermissions');
+        expect(url).toContain('/rest-v2/hackathon/project/modifyPermissions');
         expect(JSON.parse(init.body)).toEqual({
             name: 'p-1',
             permissions: {
@@ -161,7 +161,7 @@ describe('updateProjectReadAccess', () => {
         const result = await updateProjectReadAccess('p-1', readAccessStub);
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/project/modifyReadAccess');
+        expect(url).toContain('/rest-v2/hackathon/project/modifyReadAccess');
         expect(JSON.parse(init.body)).toEqual({ name: 'p-1', readAccess: { type: 'public' } });
         expect(result.isOk()).toBe(true);
         expect(result._unsafeUnwrap().toString()).toBe('t-ra');
@@ -175,7 +175,7 @@ describe('deleteProject', () => {
         const result = await deleteProject('p-1');
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/project/delete');
+        expect(url).toContain('/rest-v2/hackathon/project/delete');
         expect(JSON.parse(init.body)).toEqual({ name: 'p-1' });
         expect(result.isOk()).toBe(true);
         expect(result._unsafeUnwrap()).toBeUndefined();

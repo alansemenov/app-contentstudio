@@ -1,6 +1,6 @@
 import { $config } from '../../config/config.store';
 
-const REST_PATH = 'rest-v2/cs';
+const REST_PATH = 'rest-v2/hackathon';
 
 type ActiveProjectResolver = () => string | undefined;
 
@@ -47,7 +47,7 @@ export function getCmsPath(endpoint: string, projectName?: string): string {
 /**
  * Build a full CMS REST API URL. The admin prefix comes from the server config
  * (`adminUrl`), so vhost-mapped admin deployments resolve correctly.
- * @param path - Path to append after `<adminUrl>/rest-v2/cs/`
+ * @param path - Path to append after `<adminUrl>/rest-v2/hackathon/`
  */
 export function getCmsRestUri(path: string): string {
     return joinPath('/', $config.get().adminUrl, REST_PATH, path);

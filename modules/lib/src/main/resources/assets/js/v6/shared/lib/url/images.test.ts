@@ -18,14 +18,14 @@ describe('buildImagePreviewUrl', () => {
     it('should build the bare preview url scoped to the active project', () => {
         const url = buildImagePreviewUrl({ contentId: 'abc-1' });
 
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/image/abc-1');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/image/abc-1');
         expect(url).not.toContain('?');
     });
 
     it('should scope the url to an explicit project', () => {
         const url = buildImagePreviewUrl({ contentId: 'abc-1', projectName: 'other' });
 
-        expect(url).toContain('/rest-v2/cs/cms/other/content/content/image/abc-1');
+        expect(url).toContain('/rest-v2/hackathon/cms/other/content/content/image/abc-1');
     });
 
     it('should append params unencoded in the legacy resolver order', () => {

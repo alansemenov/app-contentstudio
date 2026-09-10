@@ -28,7 +28,7 @@ describe('findPrincipals', () => {
         });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/security/principals?types=USER%2CGROUP%2CROLE&size=50');
+        expect(url).toContain('/rest-v2/hackathon/security/principals?types=USER%2CGROUP%2CROLE&size=50');
         expect(url).not.toContain('query=');
         expect(init.method).toBe('GET');
         expect(result.isOk()).toBe(true);
@@ -41,7 +41,7 @@ describe('findPrincipals', () => {
         await findPrincipals({ types: [PrincipalType.USER], query: 'jo hn', size: 20 });
 
         const [url] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/security/principals?types=USER&query=jo+hn&size=20');
+        expect(url).toContain('/rest-v2/hackathon/security/principals?types=USER&query=jo+hn&size=20');
     });
 
     it('should return an AppError for non-ok responses', async () => {
@@ -61,7 +61,7 @@ describe('resolvePrincipalsByKeys', () => {
         const result = await resolvePrincipalsByKeys([PrincipalKey.fromString('user:system:su')]);
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/security/principals/resolveByKeys');
+        expect(url).toContain('/rest-v2/hackathon/security/principals/resolveByKeys');
         expect(init).toMatchObject({
             method: 'POST',
             body: JSON.stringify({ keys: ['user:system:su'], memberships: false }),

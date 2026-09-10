@@ -26,7 +26,7 @@ import com.enonic.xp.task.TaskService;
 @Path(ResourceConstants.REST_ROOT + "tasks")
 @Produces(MediaType.APPLICATION_JSON)
 @RolesAllowed({RoleKeys.ADMIN_LOGIN_ID, RoleKeys.ADMIN_ID})
-@Component(immediate = true, property = "group=v2cs")
+@Component(immediate = true, property = "group=v2hackathon")
 public final class TaskResource
     implements JaxRsComponent
 {

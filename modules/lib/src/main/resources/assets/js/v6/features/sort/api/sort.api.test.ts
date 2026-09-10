@@ -42,7 +42,7 @@ describe('reorderChildren', () => {
         });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/reorderChildren');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/reorderChildren');
         expect(init.method).toBe('POST');
 
         const body = JSON.parse(init.body);
@@ -86,7 +86,7 @@ describe('setChildOrder', () => {
         });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/setChildOrder');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/setChildOrder');
         expect(init.method).toBe('POST');
 
         const body = JSON.parse(init.body);

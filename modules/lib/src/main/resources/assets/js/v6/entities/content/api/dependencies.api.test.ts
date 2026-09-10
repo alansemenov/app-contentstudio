@@ -29,7 +29,7 @@ describe('resolveDependencies', () => {
         const result = await resolveDependencies([new ContentId('a'), new ContentId('b')]);
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/getDependencies');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/getDependencies');
         expect(init.method).toBe('POST');
         expect(JSON.parse(init.body)).toEqual({ contentIds: ['a', 'b'], target: 'draft' });
 

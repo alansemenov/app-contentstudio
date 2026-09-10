@@ -9,7 +9,7 @@ exports.GET = function (req) {
         return {
             status: 400,
             contentType: 'text/plain',
-            body: 'Missing required parameter: contentId'
+            body: 'Missing required parameter: contentId',
         };
     }
 
@@ -17,7 +17,7 @@ exports.GET = function (req) {
     var cssUrls = [];
 
     var extBaseUrl = adminLib.extensionUrl({
-        application: 'com.enonic.app.contentstudio',
+        application: app.name,
         extension: 'style',
     });
 
@@ -34,7 +34,7 @@ exports.GET = function (req) {
         headers: {
             'Cache-Control': 'no-store',
         },
-        body: styles
+        body: styles,
     };
 };
 

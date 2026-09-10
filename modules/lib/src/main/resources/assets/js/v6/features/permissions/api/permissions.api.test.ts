@@ -33,7 +33,7 @@ describe('getDescendantsOfContents', () => {
         const result = await getDescendantsOfContents([contentPath('/a')]);
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/getDescendantsOfContents');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/getDescendantsOfContents');
         expect(init).toMatchObject({
             method: 'POST',
             body: JSON.stringify({ contentPaths: ['/a'] }),
@@ -66,7 +66,7 @@ describe('fetchRootPermissions', () => {
         const result = await fetchRootPermissions();
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/rootPermissions');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/rootPermissions');
         expect(url).not.toContain('?');
         expect(init.method).toBe('GET');
         expect(result.isOk()).toBe(true);
@@ -96,7 +96,7 @@ describe('applyContentPermissions', () => {
         });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/applyPermissions');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/applyPermissions');
         expect(init.method).toBe('POST');
 
         const body = JSON.parse(init.body);

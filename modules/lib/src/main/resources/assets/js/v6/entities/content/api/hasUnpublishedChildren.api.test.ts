@@ -31,7 +31,7 @@ describe('hasUnpublishedChildren', () => {
         const result = await hasUnpublishedChildren([new ContentId('a'), new ContentId('b')]);
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/hasUnpublishedChildren');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/hasUnpublishedChildren');
         expect(init.method).toBe('POST');
         expect(JSON.parse(init.body)).toEqual({ contentIds: ['a', 'b'] });
 

@@ -76,7 +76,7 @@ import static java.util.stream.Collectors.toList;
 @Path(ResourceConstants.REST_ROOT + "project")
 @Produces(MediaType.APPLICATION_JSON)
 @RolesAllowed({RoleKeys.ADMIN_ID, RoleKeys.ADMIN_LOGIN_ID})
-@Component(immediate = true, property = "group=v2cs", configurationPid = "com.enonic.xp.project")
+@Component(immediate = true, property = "group=v2hackathon", configurationPid = "com.enonic.xp.project")
 public final class ProjectResource
     implements JaxRsComponent
 {

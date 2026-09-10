@@ -36,7 +36,7 @@ describe('fetchApplicationMixins', () => {
 
         const [url, init] = mockFetch.mock.calls[0];
         expect(url).toContain(
-            '/rest-v2/cs/cms/test-project/content/schema/mixins/getApplicationMixinsForContentType?contentTypeName=my%3Atype&applicationKey=com.app',
+            '/rest-v2/hackathon/cms/test-project/content/schema/mixins/getApplicationMixinsForContentType?contentTypeName=my%3Atype&applicationKey=com.app',
         );
         expect(url).not.toContain('/content/content/');
         expect(init.method).toBe('GET');
@@ -61,7 +61,9 @@ describe('fetchContentMixins', () => {
         const result = await fetchContentMixins(contentId('c-1'));
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/schema/mixins/getContentMixins?contentId=c-1');
+        expect(url).toContain(
+            '/rest-v2/hackathon/cms/test-project/content/schema/mixins/getContentMixins?contentId=c-1',
+        );
         expect(url).not.toContain('/content/content/');
         expect(init.method).toBe('GET');
         expect(result.isOk()).toBe(true);

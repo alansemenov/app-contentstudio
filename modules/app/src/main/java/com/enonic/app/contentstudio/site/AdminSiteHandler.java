@@ -53,10 +53,10 @@ public class AdminSiteHandler
 
     protected ExceptionRenderer exceptionRenderer;
 
-    public static final String ADMIN_SITE_PREFIX = "/admin/com.enonic.app.contentstudio/site/";
+    public static final String ADMIN_SITE_PREFIX = "/admin/com.enonic.app.hackathon/site/";
 
     private static final Pattern ADMIN_SITE_PATH_PATTERN = Pattern.compile(
-        "^(?<base>/admin/com.enonic.app.contentstudio/site/(?<mode>edit|preview|admin|inline))/(?<project>[^/]+)/(?<branch>[^/]+)(?<path>.*)" );
+        "^(?<base>/admin/com.enonic.app.hackathon/site/(?<mode>edit|preview|admin|inline))/(?<project>[^/]+)/(?<branch>[^/]+)(?<path>.*)" );
 
     private final ContentService contentService;
 

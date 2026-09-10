@@ -28,7 +28,7 @@ import static com.enonic.app.contentstudio.rest.resource.ResourceConstants.REST_
 @Path(REST_ROOT + "{content:(content|" + CONTENT_CMS_PATH + "/content)}/archive")
 @Produces(MediaType.APPLICATION_JSON)
 @RolesAllowed({RoleKeys.ADMIN_LOGIN_ID, RoleKeys.ADMIN_ID})
-@Component(immediate = true, property = "group=v2cs")
+@Component(immediate = true, property = "group=v2hackathon")
 public final class ArchiveResource
     implements JaxRsComponent
 {

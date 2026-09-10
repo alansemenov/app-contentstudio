@@ -34,7 +34,7 @@ describe('fetchContentAttachments', () => {
         const result = await fetchContentAttachments(contentId('c-1'));
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/getAttachments?id=c-1');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/getAttachments?id=c-1');
         expect(init.method).toBe('GET');
         expect(result.isOk()).toBe(true);
         expect(result._unsafeUnwrap()).toEqual({ attachmentsFrom: [{ name: 'doc.pdf' }] });

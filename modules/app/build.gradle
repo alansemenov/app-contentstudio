@@ -8,7 +8,7 @@ base {
 }
 
 app {
-    name = 'com.enonic.app.contentstudio'
+    name = 'com.enonic.app.hackathon'
     group = 'com.enonic.app'
     systemVersion = "${xpVersion}"
     instruction '-fixupmessages', 'Unable to determine whether the annotation jakarta*;is:=ignore'

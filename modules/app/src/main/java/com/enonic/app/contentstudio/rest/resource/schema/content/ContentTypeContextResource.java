@@ -37,7 +37,7 @@ import static com.enonic.app.contentstudio.rest.resource.ResourceConstants.CONTE
 @Path(ResourceConstants.REST_ROOT + "{content:(" + CONTENT_CMS_PATH + ")}/schema/content")
 @Produces("application/json")
 @RolesAllowed({RoleKeys.ADMIN_LOGIN_ID, RoleKeys.ADMIN_ID})
-@Component(immediate = true, property = "group=v2cs")
+@Component(immediate = true, property = "group=v2hackathon")
 public final class ContentTypeContextResource
     implements JaxRsComponent
 {

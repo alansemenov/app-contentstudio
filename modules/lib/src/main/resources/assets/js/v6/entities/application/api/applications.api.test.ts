@@ -26,7 +26,7 @@ describe('fetchSiteApplications', () => {
         const result = await fetchSiteApplications();
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/application/getSiteApplications');
+        expect(url).toContain('/rest-v2/hackathon/application/getSiteApplications');
         expect(url).not.toContain('?');
         expect(init.method).toBe('GET');
         expect(result.isOk()).toBe(true);

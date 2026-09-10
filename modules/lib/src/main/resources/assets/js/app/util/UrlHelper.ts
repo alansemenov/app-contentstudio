@@ -8,7 +8,7 @@ export class UrlHelper {
     static toolUriPropertyName = 'toolUri';
 
     static getCmsRestUri(path: string): string {
-        return UriHelper.getAdminUri(UriHelper.joinPath('rest-v2', 'cs', UriHelper.relativePath(path)));
+        return UriHelper.getAdminUri(UriHelper.joinPath('rest-v2', 'hackathon', UriHelper.relativePath(path)));
     }
 
     static getCMSPath(contentRootPath?: string, project?: Readonly<Project>): string {

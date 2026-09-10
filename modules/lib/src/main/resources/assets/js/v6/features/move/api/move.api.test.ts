@@ -28,7 +28,7 @@ describe('moveContent', () => {
         const result = await moveContent([contentId('a'), contentId('b')], contentPath('/target'));
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/move');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/move');
         expect(init).toMatchObject({
             method: 'POST',
             body: JSON.stringify({ contentIds: ['a', 'b'], parentContentPath: '/target' }),

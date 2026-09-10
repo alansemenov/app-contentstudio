@@ -30,7 +30,7 @@ describe('fetchContentVersions', () => {
         const result = await fetchContentVersions({ contentId: contentId('c-1') });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/getVersions');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/getVersions');
         expect(init.method).toBe('POST');
         expect(init.body).toBe(JSON.stringify({ contentId: 'c-1', size: -1 }));
         expect(result.isOk()).toBe(true);

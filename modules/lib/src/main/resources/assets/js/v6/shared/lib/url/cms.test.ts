@@ -20,7 +20,7 @@ describe('joinPath', () => {
     });
 
     it('should collapse a leading double slash to a single slash', () => {
-        expect(joinPath('/', '', 'rest-v2/cs')).toBe('/rest-v2/cs');
+        expect(joinPath('/', '', 'rest-v2/hackathon')).toBe('/rest-v2/hackathon');
     });
 
     it('should preserve the protocol double slash', () => {
@@ -33,16 +33,16 @@ describe('getCmsRestUri', () => {
     // forces a leading slash to produce an absolute-from-root REST URL.
     it('should build an absolute url under the admin prefix', () => {
         $config.setKey('adminUrl', '/admin');
-        expect(getCmsRestUri('security/principals')).toBe('/admin/rest-v2/cs/security/principals');
+        expect(getCmsRestUri('security/principals')).toBe('/admin/rest-v2/hackathon/security/principals');
     });
 
     it('should build a root-absolute url when admin is vhost-mapped to root (empty adminUrl)', () => {
         $config.setKey('adminUrl', '');
-        expect(getCmsRestUri('security/principals')).toBe('/rest-v2/cs/security/principals');
+        expect(getCmsRestUri('security/principals')).toBe('/rest-v2/hackathon/security/principals');
     });
 
     it('should force a leading slash when adminUrl has none', () => {
         $config.setKey('adminUrl', 'admin');
-        expect(getCmsRestUri('security/principals')).toBe('/admin/rest-v2/cs/security/principals');
+        expect(getCmsRestUri('security/principals')).toBe('/admin/rest-v2/hackathon/security/principals');
     });
 });

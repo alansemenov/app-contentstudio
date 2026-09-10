@@ -21,7 +21,7 @@ describe('fetchMimeTypesByContentTypeNames', () => {
         const result = await fetchMimeTypesByContentTypeNames(['media:video', 'media:image']);
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/schema/content/getMimeTypes?typeNames=media%3Aimage%2Cmedia%3Avideo');
+        expect(url).toContain('/rest-v2/hackathon/schema/content/getMimeTypes?typeNames=media%3Aimage%2Cmedia%3Avideo');
         expect(url).not.toContain('/cms/');
         expect(init.method).toBe('GET');
         expect(result.isOk()).toBe(true);

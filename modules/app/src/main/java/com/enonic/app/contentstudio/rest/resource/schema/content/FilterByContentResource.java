@@ -30,7 +30,7 @@ import static com.enonic.app.contentstudio.rest.resource.ResourceConstants.REST_
 @Path(REST_ROOT + "{content:(" + CONTENT_CMS_PATH + ")}/schema/filter")
 @Produces(MediaType.APPLICATION_JSON)
 @RolesAllowed({RoleKeys.ADMIN_LOGIN_ID, RoleKeys.ADMIN_ID})
-@Component(immediate = true, property = "group=v2cs")
+@Component(immediate = true, property = "group=v2hackathon")
 public class FilterByContentResource
     implements JaxRsComponent
 {

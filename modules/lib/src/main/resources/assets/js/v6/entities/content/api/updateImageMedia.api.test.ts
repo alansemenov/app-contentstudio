@@ -39,7 +39,7 @@ describe('updateImageMedia', () => {
 
         const [xhr] = xhrs;
         expect(xhr.method).toBe('POST');
-        expect(xhr.url).toContain('/rest-v2/cs/cms/test-project/content/content/updateMedia');
+        expect(xhr.url).toContain('/rest-v2/hackathon/cms/test-project/content/content/updateMedia');
         expect(xhr.body).toBeInstanceOf(FormData);
 
         const form = xhr.body as FormData;

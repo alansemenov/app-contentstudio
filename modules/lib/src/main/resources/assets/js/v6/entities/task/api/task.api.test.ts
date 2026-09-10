@@ -29,7 +29,7 @@ describe('fetchTaskInfo', () => {
         const result = await fetchTaskInfo(taskId('t/1'));
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/tasks/t%2F1');
+        expect(url).toContain('/rest-v2/hackathon/tasks/t%2F1');
         expect(init.method).toBe('GET');
         expect(result.isOk()).toBe(true);
         expect(result._unsafeUnwrap()).toEqual({ taskFrom: { id: 't/1', state: 'RUNNING' } });

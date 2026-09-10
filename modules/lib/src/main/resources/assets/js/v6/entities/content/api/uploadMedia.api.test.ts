@@ -42,7 +42,7 @@ describe('uploadMediaFile', () => {
 
         const [xhr] = xhrs;
         expect(xhr.method).toBe('POST');
-        expect(xhr.url).toContain('/rest-v2/cs/cms/test-project/content/content/createMedia');
+        expect(xhr.url).toContain('/rest-v2/hackathon/cms/test-project/content/content/createMedia');
         expect(xhr.body).toBeInstanceOf(FormData);
 
         const form = xhr.body as FormData;
@@ -180,7 +180,7 @@ describe('uploadRemoteImage', () => {
 
         const [xhr] = xhrs;
         expect(xhr.method).toBe('POST');
-        expect(xhr.url).toContain('/rest-v2/cs/cms/test-project/content/content/createMediaFromUrl');
+        expect(xhr.url).toContain('/rest-v2/hackathon/cms/test-project/content/content/createMediaFromUrl');
         expect(xhr.requestHeaders['Content-Type']).toBe('application/json');
 
         const payload = JSON.parse(xhr.body as string);

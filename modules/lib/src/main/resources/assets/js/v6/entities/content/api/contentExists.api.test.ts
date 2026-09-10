@@ -23,7 +23,7 @@ describe('contentExistsByPath', () => {
         const result = await contentExistsByPath('/site/page');
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/contentsExistByPath');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/contentsExistByPath');
         expect(init).toMatchObject({
             method: 'POST',
             body: JSON.stringify({ contentPaths: ['/site/page'] }),

@@ -34,7 +34,7 @@ describe('contentSelectorQuery', () => {
         const result = await contentSelectorQuery({ searchString: 'ann', from: 0, size: 50 });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/selectorQuery');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/selectorQuery');
         expect(init.method).toBe('POST');
 
         const body = JSON.parse(init.body);
@@ -96,7 +96,7 @@ describe('contentTreeSelectorQuery', () => {
         });
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/content/treeSelectorQuery');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/content/treeSelectorQuery');
         expect(init.method).toBe('POST');
 
         const body = JSON.parse(init.body);

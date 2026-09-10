@@ -30,7 +30,7 @@ describe('fetchAllContentTypes', () => {
         const result = await fetchAllContentTypes();
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/schema/content/all');
+        expect(url).toContain('/rest-v2/hackathon/schema/content/all');
         expect(url).not.toContain('/cms/');
         expect(init.method).toBe('GET');
         expect(result.isOk()).toBe(true);
@@ -54,7 +54,7 @@ describe('fetchContentTypesByContent', () => {
         const result = await fetchContentTypesByContent(contentId('c-1'));
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/content/schema/content/byContent?contentId=c-1');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/content/schema/content/byContent?contentId=c-1');
         expect(url).not.toContain('/content/content/');
         expect(init.method).toBe('GET');
         expect(result.isOk()).toBe(true);

@@ -25,7 +25,7 @@ describe('fetchIssueStats', () => {
         const result = await fetchIssueStats('my-project');
 
         const [url, init] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/my-project/issue/stats');
+        expect(url).toContain('/rest-v2/hackathon/cms/my-project/issue/stats');
         expect(url).not.toContain('/content/');
         expect(init).toMatchObject({ method: 'POST', body: JSON.stringify({ type: null }) });
         expect(result.isOk()).toBe(true);
@@ -38,7 +38,7 @@ describe('fetchIssueStats', () => {
         await fetchIssueStats();
 
         const [url] = mockFetch.mock.calls[0];
-        expect(url).toContain('/rest-v2/cs/cms/test-project/issue/stats');
+        expect(url).toContain('/rest-v2/hackathon/cms/test-project/issue/stats');
     });
 
     it('should return an AppError for non-ok responses', async () => {
