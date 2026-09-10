@@ -54,12 +54,6 @@ export function isSettingsWidget(widget: Readonly<Extension> | undefined): boole
     return getWidgetKey(widget) === getOwnWidgetKey('settings');
 }
 
-// Settings extensions of sibling Content Studio installations on the same XP
-// declare the shared menu item interface too; only this app's own belongs here.
-function isForeignSettingsWidget(widget: Readonly<Extension>): boolean {
-    return (getWidgetKey(widget)?.endsWith(':settings') ?? false) && !isSettingsWidget(widget);
-}
-
 export function getSettingsWidget(
     widgets: Readonly<Extension>[] = $sidebarWidgets.get().widgets,
 ): Readonly<Extension> | undefined {
@@ -90,7 +84,7 @@ async function loadWidgets(): Promise<void> {
         if (result.isErr()) {
             console.error(result.error);
         } else {
-            const widgets = [createStudioWidget(), ...result.value.flat()].filter((w) => !isForeignSettingsWidget(w));
+            const widgets = [createStudioWidget(), ...result.value.flat()];
 
             $sidebarWidgets.setKey('widgets', sortWidgets(widgets));
 

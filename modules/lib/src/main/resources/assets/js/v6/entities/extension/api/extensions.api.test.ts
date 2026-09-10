@@ -4,8 +4,18 @@ import { $config } from '../../../shared/config/config.store';
 import { errorResponse, jsonResponse, restoreFetch, stubFetch } from '../../../shared/lib/test/fetch.test.utils';
 import { fetchExtensions } from './extensions.api';
 
+type ParsedExtension = { extensionFrom: { key: string } };
+
+const parsed = (result: { _unsafeUnwrap: () => unknown }): ParsedExtension[] =>
+    result._unsafeUnwrap() as ParsedExtension[];
+
 vi.mock('@enonic/lib-admin-ui/extension/Extension', () => ({
-    Extension: { fromJson: (json: unknown) => ({ extensionFrom: json }) },
+    Extension: {
+        fromJson: (json: { key: string }) => ({
+            extensionFrom: json,
+            getDescriptorKey: () => ({ getApplicationKey: () => ({ toString: () => json.key.split(':')[0] }) }),
+        }),
+    },
 }));
 
 let mockFetch: Mock;
@@ -13,6 +23,7 @@ let mockFetch: Mock;
 beforeEach(() => {
     mockFetch = stubFetch();
     $config.setKey('extensionApiUrl', '/admin/api/extension');
+    $config.setKey('appId', 'com.enonic.app.hackathon');
 });
 
 afterEach(() => {
@@ -29,7 +40,24 @@ describe('fetchExtensions', () => {
         expect(url).toBe('/admin/api/extension?interface=contentstudio.menuitem');
         expect(init.method).toBe('GET');
         expect(result.isOk()).toBe(true);
-        expect(result._unsafeUnwrap()).toEqual([{ extensionFrom: { key: 'w-1' } }, { extensionFrom: { key: 'w-2' } }]);
+        expect(parsed(result).map((e) => e.extensionFrom)).toEqual([{ key: 'w-1' }, { key: 'w-2' }]);
+    });
+
+    it('should drop extensions owned by a sibling Content Studio installation', async () => {
+        mockFetch.mockResolvedValue(
+            jsonResponse([
+                { key: 'com.enonic.app.hackathon:preview-json' },
+                { key: 'com.enonic.app.contentstudio:preview-json' },
+                { key: 'com.example.nextjs:preview' },
+            ]),
+        );
+
+        const result = await fetchExtensions('contentstudio.liveview');
+
+        expect(parsed(result).map((e) => e.extensionFrom.key)).toEqual([
+            'com.enonic.app.hackathon:preview-json',
+            'com.example.nextjs:preview',
+        ]);
     });
 
     it('should return an AppError for non-ok responses', async () => {

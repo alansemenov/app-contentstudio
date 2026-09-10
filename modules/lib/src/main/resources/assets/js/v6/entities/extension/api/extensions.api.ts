@@ -4,6 +4,7 @@ import { type ResultAsync } from 'neverthrow';
 import { requestJson } from '../../../shared/api/client';
 import { type AppError } from '../../../shared/api/errors';
 import { $config } from '../../../shared/config/config.store';
+import { isSiblingStudioExtension } from '../lib/siblingExtensions';
 
 /**
  * Fetch the extensions registered for the given interface.
@@ -12,5 +13,7 @@ import { $config } from '../../../shared/config/config.store';
 export function fetchExtensions(interfaceName: string): ResultAsync<Extension[], AppError> {
     const url = `${$config.get().extensionApiUrl}?interface=${encodeURIComponent(interfaceName)}`;
 
-    return requestJson<ExtensionDescriptorJson[]>(url).map((json) => json.map(Extension.fromJson));
+    return requestJson<ExtensionDescriptorJson[]>(url).map((json) =>
+        json.map(Extension.fromJson).filter((extension) => !isSiblingStudioExtension(extension)),
+    );
 }

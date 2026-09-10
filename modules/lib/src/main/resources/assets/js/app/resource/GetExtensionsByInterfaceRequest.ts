@@ -1,12 +1,11 @@
-import {type JsonResponse} from '@enonic/lib-admin-ui/rest/JsonResponse';
-import {ExtensionDescriptorResourceRequest} from './ExtensionDescriptorResourceRequest';
-import {type ExtensionDescriptorJson} from '@enonic/lib-admin-ui/extension/ExtensionDescriptorJson';
-import {type Extension} from '@enonic/lib-admin-ui/extension/Extension';
-import {HttpMethod} from '@enonic/lib-admin-ui/rest/HttpMethod';
+import { type JsonResponse } from '@enonic/lib-admin-ui/rest/JsonResponse';
+import { ExtensionDescriptorResourceRequest } from './ExtensionDescriptorResourceRequest';
+import { type ExtensionDescriptorJson } from '@enonic/lib-admin-ui/extension/ExtensionDescriptorJson';
+import { type Extension } from '@enonic/lib-admin-ui/extension/Extension';
+import { HttpMethod } from '@enonic/lib-admin-ui/rest/HttpMethod';
+import { isSiblingStudioExtension } from '../../v6/entities/extension/lib/siblingExtensions';
 
-export class GetExtensionsByInterfaceRequest
-    extends ExtensionDescriptorResourceRequest<Extension[]> {
-
+export class GetExtensionsByInterfaceRequest extends ExtensionDescriptorResourceRequest<Extension[]> {
     private readonly extensionInterface: string;
 
     constructor(extensionInterface: string) {
@@ -22,6 +21,8 @@ export class GetExtensionsByInterfaceRequest
     }
 
     protected parseResponse(response: JsonResponse<ExtensionDescriptorJson[]>): Extension[] {
-        return ExtensionDescriptorResourceRequest.fromJson(response.getResult());
+        return ExtensionDescriptorResourceRequest.fromJson(response.getResult()).filter(
+            (e) => !isSiblingStudioExtension(e),
+        );
     }
 }
