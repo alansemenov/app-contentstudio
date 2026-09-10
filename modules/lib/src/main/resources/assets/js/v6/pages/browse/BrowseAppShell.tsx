@@ -13,6 +13,7 @@ import { RequestPublishDialog } from '../../features/request-publish/ui/RequestP
 import { SortDialog } from '../../features/sort/ui/SortDialog';
 import { UnpublishDialog } from '../../features/unpublish/ui/UnpublishDialog';
 import { PermissionsDialog } from '../../features/permissions/ui/PermissionsDialog';
+import { JukeWidget } from '../../features/juke/ui/JukeWidget';
 
 export const BrowseAppShell = (): ReactElement => {
     return (
@@ -32,6 +33,9 @@ export const BrowseAppShell = (): ReactElement => {
             <RequestPublishDialog />
             <SortDialog />
             <UnpublishDialog />
+
+            {/* Voice assistant */}
+            <JukeWidget />
         </>
     );
 };

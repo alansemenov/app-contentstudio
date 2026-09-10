@@ -78,6 +78,63 @@
   --dash-color: var(--color-bdr-select);
 }
 
+/* Juke voice assistant: icon breathes while listening, bobs beside an equalizer while speaking */
+@keyframes juke-breathe {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 4px 10px rgb(0 0 0 / 0.25)) drop-shadow(0 0 0 transparent);
+  }
+  50% {
+    transform: scale(1.06);
+    filter: drop-shadow(0 4px 10px rgb(0 0 0 / 0.25)) drop-shadow(0 0 16px var(--juke-glow));
+  }
+}
+
+@keyframes juke-breathe-ring {
+  0%, 100% {
+    transform: scale(1.05);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.9;
+  }
+}
+
+@keyframes juke-bob {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes juke-eq {
+  from {
+    height: 5px;
+  }
+  to {
+    height: 20px;
+  }
+}
+
+@utility animate-juke-breathe {
+  animation: juke-breathe 2.6s ease-in-out infinite;
+}
+
+@utility animate-juke-breathe-ring {
+  animation: juke-breathe-ring 2.6s ease-in-out infinite;
+}
+
+@utility animate-juke-bob {
+  animation: juke-bob 1.1s ease-in-out infinite;
+}
+
+@utility animate-juke-eq {
+  animation: juke-eq 0.7s ease-in-out infinite alternate;
+}
+
 /* HACKS */
 @layer overrides {
   /* Hide launcher buttons that is injected from Launcher app */

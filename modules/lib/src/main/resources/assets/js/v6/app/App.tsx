@@ -11,6 +11,7 @@ import { startContentService } from '../entities/content';
 import { start as startDeleteDialogService } from '../features/delete/model/deleteDialog.service';
 import { start as startDuplicateDialogService } from '../features/duplicate/model/duplicateDialog.service';
 import { start as startIssueDialogService } from '../features/issues/model/issueDialog.service';
+import { start as startJukeService } from '../features/juke/model/juke.service';
 import { start as startIssueDialogDetailsService } from '../features/issues/model/issueDialogDetails.service';
 import { start as startNewIssueDialogService } from '../features/issues/model/newIssueDialog.service';
 import { start as startPublishDialogService } from '../features/publish/model/publishDialog.service';
@@ -67,6 +68,7 @@ export class AppElement extends LegacyElement<typeof App> {
             startRequestPublishDialogService();
             startSortDialogService();
             startUnpublishDialogService();
+            startJukeService();
             AppElement.INSTANCE = new AppElement();
             Body.get().appendChild(AppElement.INSTANCE);
         }

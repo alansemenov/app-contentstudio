@@ -1,0 +1,155 @@
+import { showWarning } from '@enonic/lib-admin-ui/notify/MessageBus';
+import { i18n } from '@enonic/lib-admin-ui/util/Messages';
+import { registerCommands, resolveCommand } from '../commands/command.registry';
+import type { JukeReply } from '../commands/command.types';
+import { sessionCommands } from '../commands/session.commands';
+import { normalizeTranscript } from '../speech/normalize';
+import {
+    createRecognizer as defaultCreateRecognizer,
+    type Recognizer,
+    type RecognizerHandlers,
+} from '../speech/recognizer';
+import { createSpeaker as defaultCreateSpeaker, type Speaker } from '../speech/speaker';
+import {
+    $jukeAvailable,
+    getJukeContext,
+    resetJukeState,
+    setJukeActivity,
+    setJukeMode,
+    setJukePrompt,
+    setJukeTranscript,
+} from './juke.store';
+
+//
+// * Juke service
+//
+// Starts the microphone while Juke is available, routes transcripts to the
+// command registry and speaks replies. Recognition is paused while speaking so
+// Juke does not hear itself. Started explicitly from the app root.
+//
+
+export type JukeServiceDeps = {
+    createRecognizer?: (handlers: RecognizerHandlers) => Recognizer | null;
+    createSpeaker?: () => Speaker | null;
+};
+
+let unsubscribe: (() => void) | null = null;
+let recognizer: Recognizer | null = null;
+let speaker: Speaker | null = null;
+let deniedNotified = false;
+let deps: Required<JukeServiceDeps> = {
+    createRecognizer: (handlers) => defaultCreateRecognizer(handlers),
+    createSpeaker: () => defaultCreateSpeaker(),
+};
+
+// Replies are spoken one after another, never interleaved.
+let queue: Promise<void> = Promise.resolve();
+
+const enqueue = (task: () => Promise<void>): void => {
+    queue = queue.then(task).catch((error) => {
+        console.error('[juke] command failed', error);
+    });
+};
+
+const respond = async (reply: JukeReply): Promise<void> => {
+    setJukeActivity('speaking');
+    recognizer?.pause();
+    try {
+        await speaker?.speak(reply.say);
+    } finally {
+        setJukeActivity('listening');
+        if (reply.prompt !== undefined) {
+            setJukePrompt(reply.prompt);
+        }
+        if (reply.mode != null) {
+            setJukeMode(reply.mode);
+        }
+        recognizer?.resume();
+    }
+};
+
+const handleTranscripts = (alternatives: string[]): void => {
+    const normalized = alternatives.map(normalizeTranscript).filter((text) => text.length > 0);
+    if (normalized.length === 0) {
+        return;
+    }
+    setJukeTranscript(normalized[0]);
+
+    const context = getJukeContext();
+    if (context.mode === 'off') {
+        return;
+    }
+
+    const resolved = resolveCommand(normalized, context);
+    if (resolved == null) {
+        if (context.mode === 'dialog') {
+            enqueue(() => respond({ say: i18n('juke.reply.unknown') }));
+        }
+        return;
+    }
+
+    enqueue(async () => {
+        const reply = await resolved.command.run(resolved.args, context);
+        if (reply != null) {
+            await respond(reply);
+        }
+    });
+};
+
+const deactivate = (): void => {
+    recognizer?.stop();
+    recognizer = null;
+    speaker?.cancel();
+    speaker = null;
+    resetJukeState();
+};
+
+const handleDenied = (): void => {
+    deactivate();
+    if (!deniedNotified) {
+        deniedNotified = true;
+        showWarning(i18n('juke.notify.micDenied'), false);
+    }
+};
+
+const activate = (): void => {
+    if (recognizer != null) {
+        return;
+    }
+    speaker = deps.createSpeaker();
+    recognizer = deps.createRecognizer({ onTranscripts: handleTranscripts, onDenied: handleDenied });
+    if (recognizer == null || speaker == null) {
+        deactivate();
+        return;
+    }
+    recognizer.start();
+    setJukeMode('idle');
+};
+
+/**
+ * Start Juke. Safe to call multiple times - will only initialize once.
+ */
+export const start = (overrides: JukeServiceDeps = {}): void => {
+    if (unsubscribe != null) {
+        return;
+    }
+    deps = { ...deps, ...overrides };
+    registerCommands(...sessionCommands);
+    unsubscribe = $jukeAvailable.subscribe((available) => {
+        if (available) {
+            activate();
+        } else {
+            deactivate();
+        }
+    });
+};
+
+/**
+ * Stop Juke, release the microphone and detach all subscriptions.
+ */
+export const stop = (): void => {
+    unsubscribe?.();
+    unsubscribe = null;
+    deactivate();
+    queue = Promise.resolve();
+};

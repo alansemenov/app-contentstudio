@@ -20,7 +20,7 @@ is not used functionally, only as a gate.
 | Name matching | Case-insensitive, punctuation-normalized, best unique match (exact > prefix > containment). Ambiguity is reported as not found. | Tolerates recognition errors without picking wrong items. |
 | Wake word | Always listening while the browse page is open. | Matches the spec. |
 | Scope | Browse view only for milestones 1–4. Later milestones will add voice integration with Juke Operator and Juke Translator, so the command registry must be extensible and the widget must be mountable in wizard mode later. | User clarification. |
-| Operator gate | Client-side: `$aiRegisteredPlugins['ai.contentOperator']` from `v6/features/ai/ai.store.ts`, which is true only when the operator bundle has loaded and registered. Server-side `aiEnabled` already gates the bundle load. | No new server code; reflects "installed and running", not just "installed". |
+| Operator gate | `$config.aiEnabled && $config.browseMode` from `shared/config/config.store.ts`. On the browse page the server sets `aiEnabled` only from the operator's running state (`main.js` `getParams`). | No new server code; reflects "installed and running". The v6 boundary rules forbid `features/juke` importing `features/ai`, so the AI host's registered-plugins store cannot be used. |
 | Create content | Follow the spec: POST `content/create`, then open the edit tab for the created id. Parent is the single selected item, otherwise project root. | Spec explicitly names `content/create`. The existing `NewContentEvent` flow only opens a `/new/<type>` tab without creating. |
 | Icon | Reuse `v6/shared/ui/icons/JukeIcon.tsx` | Same branding as the operator toggle in the wizard toolbar. |
 | Icon animations | Accepting commands: "breathe" (slow scale 1→1.06 with a green glow and a faint ring, 2.6 s loop). Answering: "bars" (four-bar equalizer pill to the left of the icon, icon bobs). Glow color is theme-aware: deep green on light, pale mint `#a2ffbd` on dark. Icon size 64 px, fixed bottom-right. | Chosen by the user on 2026-09-10 in the voice picker; pale mint alone was invisible on the light theme. |
@@ -49,30 +49,41 @@ is not used functionally, only as a gate.
 
 ```
 v6/features/juke/
-  index.ts                     public surface: startJukeService(), JukeWidget
+  index.ts                     public surface: startJukeService(), JukeWidget, read-only computed views,
+                               registerCommands() and command types for later milestones
   model/
-    juke.store.ts              $jukeMode ('off' | 'idle' | 'dialog'), $jukeActivity ('listening' | 'speaking' | 'thinking'),
-                               $jukeAvailable (computed: operator registered && browser supports speech),
-                               $jukeTranscript (last recognized phrase), $jukePendingPrompt (see below)
-    juke.service.ts            wires recognizer -> command dispatcher -> speaker; starts/stops on $jukeAvailable
+    juke.store.ts              $jukeMode ('off' | 'idle' | 'dialog'), $jukeActivity ('listening' | 'speaking'),
+                               $jukePrompt (pending prompt, see below), $jukeTranscript (last phrase, diagnostic),
+                               $jukeSpeechSupported, $jukeAvailable (computed: aiEnabled && browseMode && supported),
+                               $isJukeVisible; getJukeContext() builds the JukeContext for commands
+    juke.service.ts            start()/stop(); subscribes to $jukeAvailable, owns recognizer + speaker,
+                               routes transcripts to the registry, speaks replies one at a time (queue),
+                               pauses recognition while speaking; deps injectable for tests
   speech/
-    recognizer.ts              SpeechRecognition wrapper: continuous, interim=false, auto-restart, pause/resume
-    speaker.ts                 speechSynthesis wrapper: speak(text) -> Promise<void>, cancels queue, en-US voice
-    normalize.ts               lowercase, strip punctuation, collapse whitespace, strip leading "juke,"
+    support.ts                 minimal SpeechRecognition types, getRecognitionCtor(), getSynthesis(), isSpeechSupported()
+    recognizer.ts              createRecognizer(handlers): continuous, final-only, 3 alternatives, auto-restart
+                               with back-off on network errors, pause()/resume(), stops for good on not-allowed
+    speaker.ts                 createSpeaker(): speak(text) -> Promise<void>, pickVoice() (Google UK English Male >
+                               en-GB > en), safety timeout for utterances whose end never fires
+    normalize.ts               lowercase, drop apostrophes, strip punctuation, collapse whitespace
   commands/
-    command.types.ts           JukeCommand = { id, phase: 'any' | 'dialog' | 'search' | 'confirm', match(text) -> args | null,
-                               run(args, ctx) -> Promise<JukeReply> }; JukeReply = { say: string; nextPrompt?: PendingPrompt }
-    command.registry.ts        ordered registry, resolve(text, state) -> command or null
-    matching.ts                bestUniqueMatch(candidates, spoken) with exact > prefix > containment
-    m1.session.commands.ts     hello / goodbye / fallback
-    m2.project.commands.ts     "go to <project>"
-    m2.content.commands.ts     "create a new <content type>"
-    m3.search.commands.ts      "new search", filter phrases, keywords, "yes" to show results
-    m3.select.commands.ts      select/unselect by position, name, all
-    m4.toolbar.commands.ts     edit, delete, move, duplicate, preview with confirmation prompts
+    command.types.ts           JukeMode, JukePrompt, JukeContext, JukeReply { say, mode?, prompt? },
+                               JukeCommand { id, modes, prompts?, match(text, ctx) -> args | null, run(args, ctx) }
+    command.registry.ts        ordered registry: registerCommands(), resolveCommand(alternatives, ctx)
+    session.commands.ts        hello / goodbye (M1); JUKE_NAME_PATTERN with recognition variants
+    matching.ts                (M2) bestUniqueMatch(candidates, spoken) with exact > prefix > containment
+    project.commands.ts        (M2) "go to <project>"
+    content.commands.ts        (M2) "create a new <content type>"
+    search.commands.ts         (M3) "new search", filter phrases, keywords, "yes" to show results
+    select.commands.ts         (M3) select/unselect by position, name, all
+    toolbar.commands.ts        (M4) edit, delete, move, duplicate, preview with confirmation prompts
   ui/
-    JukeWidget.tsx             fixed bottom-right icon; visible only in 'dialog' mode; animation by $jukeActivity
+    JukeWidget.tsx             fixed bottom-right icon; visible only in 'dialog' mode; "breathe" while listening,
+                               equalizer "bars" pill while speaking; keyframes/utilities live in assets/styles/tailwind.css
 ```
+
+Unknown phrases are handled by the service, not a command: in `dialog` mode they get the unknown reply, in
+`idle` mode they are ignored.
 
 ### 4.1 State machine
 
