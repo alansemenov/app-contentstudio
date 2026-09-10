@@ -2,7 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { $jukeMode, $jukePrompt, resetJukeState } from '../model/juke.store';
 import { clearCommands, registerCommands, resolveCommand } from './command.registry';
 import type { JukeContext } from './command.types';
-import { goodbyeCommand, helloCommand, isSleepPhrase, isWakePhrase, sessionCommands } from './session.commands';
+import {
+    goodbyeCommand,
+    helloCommand,
+    isSleepPhrase,
+    isWakePhrase,
+    sessionCommands,
+    stripJukeAddress,
+} from './session.commands';
 
 vi.mock('@enonic/lib-admin-ui/util/Messages', () => ({
     i18n: (key: string, ...args: unknown[]) => [key, ...args].join('|'),
@@ -39,6 +46,24 @@ describe('wake and sleep phrases', () => {
     it.each(['goodbye', 'hello juke', 'bye'])('rejects "%s" as a sleep phrase', (text) => {
         expect(isSleepPhrase(text)).toBe(false);
     });
+});
+
+describe('stripJukeAddress', () => {
+    it.each([
+        ['hey juke how are you', 'how are you'],
+        ['juke go to superhero', 'go to superhero'],
+        ['hello duke select all', 'select all'],
+        ['ok juke thanks', 'thanks'],
+    ])('should strip the address from "%s"', (text, expected) => {
+        expect(stripJukeAddress(text)).toBe(expected);
+    });
+
+    it.each(['hello juke', 'juke', 'goodbye juke', 'how are you juke', 'thanks'])(
+        'should keep "%s" unchanged',
+        (text) => {
+            expect(stripJukeAddress(text)).toBe(text);
+        },
+    );
 });
 
 describe('session commands', () => {

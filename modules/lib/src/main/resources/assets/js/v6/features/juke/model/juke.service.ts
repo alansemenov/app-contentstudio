@@ -2,7 +2,8 @@ import { showWarning } from '@enonic/lib-admin-ui/notify/MessageBus';
 import { i18n } from '@enonic/lib-admin-ui/util/Messages';
 import { registerCommands, resolveCommand } from '../commands/command.registry';
 import type { JukeReply } from '../commands/command.types';
-import { sessionCommands } from '../commands/session.commands';
+import { sessionCommands, stripJukeAddress } from '../commands/session.commands';
+import { smallTalkCommands } from '../commands/smalltalk.commands';
 import { normalizeTranscript } from '../speech/normalize';
 import {
     createRecognizer as defaultCreateRecognizer,
@@ -80,7 +81,8 @@ const handleTranscripts = (alternatives: string[]): void => {
         return;
     }
 
-    const resolved = resolveCommand(normalized, context);
+    const candidates = context.mode === 'dialog' ? normalized.map(stripJukeAddress) : normalized;
+    const resolved = resolveCommand(candidates, context);
     if (resolved == null) {
         if (context.mode === 'dialog') {
             enqueue(() => respond({ say: i18n('juke.reply.unknown') }));
@@ -134,7 +136,7 @@ export const start = (overrides: JukeServiceDeps = {}): void => {
         return;
     }
     deps = { ...deps, ...overrides };
-    registerCommands(...sessionCommands);
+    registerCommands(...sessionCommands, ...smallTalkCommands);
     unsubscribe = $jukeAvailable.subscribe((available) => {
         if (available) {
             activate();

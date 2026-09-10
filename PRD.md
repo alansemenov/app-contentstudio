@@ -73,6 +73,8 @@ v6/features/juke/
                                JukeCommand { id, modes, prompts?, match(text, ctx) -> args | null, run(args, ctx) }
     command.registry.ts        ordered registry: registerCommands(), resolveCommand(alternatives, ctx)
     session.commands.ts        hello / goodbye (M1); JUKE_NAME_PATTERN with recognition variants
+    smalltalk.commands.ts      (M1) conversational replies in dialog mode: how are you, help, what can you do,
+                               who are you, thanks, nice to meet you, good morning/afternoon/evening, bare hello
     matching.ts                (M2) bestUniqueMatch(candidates, spoken) with exact > prefix > containment
     project.commands.ts        (M2) "go to <project>"
     content.commands.ts        (M2) "create a new <content type>"

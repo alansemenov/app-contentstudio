@@ -202,6 +202,18 @@ describe('juke.service', () => {
         expect($jukeActivity.get()).toBe('listening');
     });
 
+    it('answers a command spoken together with the name while in dialog', async () => {
+        start({ createRecognizer, createSpeaker });
+        makeAvailable();
+
+        await hear('hello juke');
+        await finishSpeaking();
+
+        await hear('hey juke, how are you?');
+
+        expect(speeches[0].text).toBe('juke.reply.smalltalk.howAreYou|Alan');
+    });
+
     it('uses later alternatives when the first one is misheard', async () => {
         start({ createRecognizer, createSpeaker });
         makeAvailable();

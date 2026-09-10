@@ -22,6 +22,15 @@ export function isSleepPhrase(text: string): boolean {
     return SLEEP_PATTERN.test(text);
 }
 
+const ADDRESS_PATTERN = new RegExp(`^(?:(?:hello|hey|hi|okay|ok)\\s+)?${JUKE_NAME_PATTERN}\\s+(?=\\S)`);
+
+// Drops a leading "hey juke" / "juke" so a command spoken in one breath with
+// the name ("juke, how are you") matches the command itself. A bare wake
+// phrase is returned unchanged so it still greets.
+export function stripJukeAddress(text: string): string {
+    return text.replace(ADDRESS_PATTERN, '');
+}
+
 export const helloCommand: JukeCommand<true> = {
     id: 'session.hello',
     modes: ['idle', 'dialog'],
