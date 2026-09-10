@@ -40,7 +40,7 @@ tasks.register( 'pnpmCheck', PnpmTask ) {
 
 tasks.register( 'pnpmTest', PnpmTask ) {
     dependsOn tasks.named( 'pnpmInstall' )
-    args = ['run', 'test:run']
+    args = hackathonTestsOnly.toBoolean() ? ['run', 'test:run', 'features/juke'] : ['run', 'test:run']
     outputs.cacheIf { false }
 }
 

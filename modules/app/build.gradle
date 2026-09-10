@@ -135,6 +135,11 @@ tasks.named('test').configure {
     dependsOn tasks.named('pnpmBuild')
 }
 
+if ( hackathonTestsOnly.toBoolean() )
+{
+    tasks.withType( Test ).configureEach { enabled = false }
+}
+
 tasks.named('jar').configure {
     exclude 'assets/**/*.ts'
     exclude 'assets/**/*.less'
