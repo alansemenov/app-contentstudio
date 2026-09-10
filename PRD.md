@@ -196,24 +196,34 @@ recognizer and speaker.
 
 Not verified manually yet: needs an XP with the Juke Operator running and `hackathon.jar` deployed (see §8).
 
-### Milestone 2 — Projects and content creation
+### Milestone 2 — Projects and content creation (done)
 
 Phrases:
-- `juke.reply.project.switching=Switching to "{0}"`
+- `juke.reply.project.switching=Switching to {0}`
 - `juke.reply.project.notFound=I cannot find project {0} in the system. Please try a different project.`
 - `juke.reply.content.creating=Creating a new {0}`
 - `juke.reply.content.typeNotFound=I cannot find {0} in the system. Make sure it exists.`
+- `juke.reply.content.failed=I could not create a new {0}. Please try again.`
 
-Acceptance:
-- "Go to <name>" matches against project display names (and project ids as a fallback) using best unique
-  match, calls `selectProject` without opening the dialog, and speaks the switching reply with the resolved
-  display name.
-- "Create a new <type>" matches against the content types the New Content dialog would list for the current
-  parent (selected item or root), POSTs `content/create` with generated name `__unnamed__`-style as the wizard
-  does, opens a new browser tab for editing the created content, and speaks the creating reply with the type's
-  display name.
-- Both commands answer with the not-found phrase on no match or ambiguous match.
-- Unit tests for the matcher and both commands with mocked stores and fetch.
+Behaviour:
+- Matching (`commands/matching.ts`, `bestUniqueMatch`): labels and the spoken name are normalized; tiers are
+  tried in order — exact, label starts with spoken, containment either way, every spoken word in the label —
+  and the first tier with hits decides. More than one hit is ambiguous and reported as not found.
+- "Go to <name>" (also "switch to", "open", "change to", "navigate to"; optional leading "the" and trailing
+  "project") matches against project display names and ids from `$projects`, calls `selectProject` without
+  opening the dialog and answers with the project's display name.
+- "Create a new <type>" (also "create", "make", "add", with optional "a"/"an"/"new") lists the content types the
+  New Content dialog would show for the parent — the single selected item, else the project root — via
+  `ContentTypesHelper.getAvailableContentTypes`, minus media types. The spoken name is matched against the type
+  title and local name. On a match it POSTs `content/create` through the legacy `CreateContentRequest`
+  (unnamed, empty display name, workflow in progress) and opens `/edit/<id>?displayAsNew` in a new tab via
+  `ContentUrlHelper.openEditContentTab`.
+- The edit tab is opened outside a user gesture, so browsers may block it as a pop-up; Content Studio then
+  shows its standard pop-up warning. Allow pop-ups for the admin origin when demoing.
+- Both commands are dialog-mode only.
+
+Tests: parser patterns, matcher tiers and ambiguity, project switch and not-found, content creation at root and
+under a selected parent, media exclusion, creation failure.
 
 ### Milestone 3 — Search and selection
 

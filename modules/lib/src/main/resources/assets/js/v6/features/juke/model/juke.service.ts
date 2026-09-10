@@ -1,6 +1,8 @@
 import { showWarning } from '@enonic/lib-admin-ui/notify/MessageBus';
 import { i18n } from '@enonic/lib-admin-ui/util/Messages';
 import { registerCommands, resolveCommand } from '../commands/command.registry';
+import { contentCommands } from '../commands/content.commands';
+import { projectCommands } from '../commands/project.commands';
 import type { JukeReply } from '../commands/command.types';
 import { sessionCommands, stripJukeAddress } from '../commands/session.commands';
 import { smallTalkCommands } from '../commands/smalltalk.commands';
@@ -136,7 +138,7 @@ export const start = (overrides: JukeServiceDeps = {}): void => {
         return;
     }
     deps = { ...deps, ...overrides };
-    registerCommands(...sessionCommands, ...smallTalkCommands);
+    registerCommands(...sessionCommands, ...smallTalkCommands, ...projectCommands, ...contentCommands);
     unsubscribe = $jukeAvailable.subscribe((available) => {
         if (available) {
             activate();
