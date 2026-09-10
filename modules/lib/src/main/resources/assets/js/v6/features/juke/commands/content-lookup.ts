@@ -24,20 +24,43 @@ export function buildTextSearchQuery(text: string): object {
     };
 }
 
-export async function searchContentByText(text: string, excludeIds: readonly string[] = []): Promise<ContentSummary[]> {
-    const result = await queryContent({ from: 0, size: MAX_HITS, query: buildTextSearchQuery(text) });
+export type ContentLookupOptions = {
+    excludeIds?: readonly string[];
+    // Narrows the hits before matching, e.g. to items that can hold children.
+    accept?: (content: ContentSummary) => boolean;
+};
+
+export async function searchContentByText(text: string, options: ContentLookupOptions = {}): Promise<ContentSummary[]> {
+    // The query endpoint requires the list fields to be present, even when empty.
+    const result = await queryContent({
+        from: 0,
+        size: MAX_HITS,
+        contentTypeNames: [],
+        queryFilters: [],
+        aggregationQueries: [],
+        query: buildTextSearchQuery(text),
+    });
     if (result.isErr()) {
         throw result.error;
     }
-    const excluded = new Set(excludeIds);
-    return result.value.contents.filter((content) => !excluded.has(content.getContentId().toString()));
+    const excluded = new Set(options.excludeIds ?? []);
+    const accept = options.accept ?? (() => true);
+    return result.value.contents.filter(
+        (content) => !excluded.has(content.getContentId().toString()) && accept(content),
+    );
+}
+
+// Media and page templates cannot hold children, so they never make sense as a parent.
+export function canHoldChildren(content: ContentSummary): boolean {
+    const type = content.getType();
+    return !type.isMedia() && !type.isDescendantOfMedia() && !type.isPageTemplate();
 }
 
 export async function findContentByName(
     spokenName: string,
-    excludeIds: readonly string[] = [],
+    options: ContentLookupOptions = {},
 ): Promise<MatchResult<ContentSummary>> {
-    const hits = await searchContentByText(spokenName, excludeIds);
+    const hits = await searchContentByText(spokenName, options);
     return bestUniqueMatch(
         hits.map((content) => ({ value: content, labels: [content.getDisplayName(), content.getName().toString()] })),
         spokenName,

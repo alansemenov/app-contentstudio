@@ -10,7 +10,7 @@ import { ContentEditParams } from '../../../../app/wizard/ContentEditParams';
 import { getCurrentItems, revealContentByPath } from '../../../entities/content';
 import { getActiveProject } from '../../../entities/project';
 import type { JukeCommand, JukeReply } from './command.types';
-import { findContentByName } from './content-lookup';
+import { canHoldChildren, findContentByName } from './content-lookup';
 import { bestUniqueMatch } from './matching';
 
 //
@@ -84,7 +84,7 @@ async function resolveParent(parentName: string | undefined): Promise<ParentReso
         const items = getCurrentItems();
         return { parent: items.length === 1 ? items[0] : undefined };
     }
-    const result = await findContentByName(parentName);
+    const result = await findContentByName(parentName, { accept: canHoldChildren });
     if (result.kind === 'match') {
         return { parent: result.value };
     }

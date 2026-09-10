@@ -218,7 +218,9 @@ Behaviour:
   and the first tier with hits decides. More than one hit is ambiguous and reported as not found.
 - Content lookup (`commands/content-lookup.ts`, `findContentByName`): runs the browse filter's free-text query
   (fulltext + ngram over `displayName^5`, `_name^3`, `_allText`, draft branch, current project, 50 hits) via
-  `queryContent`, then applies `bestUniqueMatch` over display name and name. Shared with Move in M4.
+  `queryContent` — the endpoint needs `contentTypeNames`, `queryFilters` and `aggregationQueries` present even
+  when empty — then applies `bestUniqueMatch` over display name and name. An optional `accept` filter narrows
+  the hits; parent lookups use `canHoldChildren` (no media, no page templates). Shared with Move in M4.
 - "Go to <name>" (also "switch to", "open", "change to", "navigate to"; optional leading "the" and trailing
   "project") matches against project display names and ids from `$projects`, calls `selectProject` without
   opening the dialog and answers with the project's display name.

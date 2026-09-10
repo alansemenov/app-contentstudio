@@ -57,6 +57,7 @@ vi.mock('../../../entities/project', () => ({
 
 vi.mock('./content-lookup', () => ({
     findContentByName: mocks.findContentByName,
+    canHoldChildren: () => true,
 }));
 
 const type = (localName: string, title: string, media = false): ContentTypeSummary => {
@@ -198,7 +199,7 @@ describe('createContentCommand', () => {
 
         const reply = await run('create a new article under news');
 
-        expect(mocks.findContentByName).toHaveBeenCalledWith('news');
+        expect(mocks.findContentByName).toHaveBeenCalledWith('news', { accept: expect.any(Function) });
         expect(mocks.getAvailableContentTypes).toHaveBeenCalledWith({ contentId: 'news-id', project: 'PROJECT' });
         expect(mocks.setParent).toHaveBeenCalledWith('NEWS_PATH');
         expect(mocks.revealContentByPath).toHaveBeenCalledWith('/news/new');
