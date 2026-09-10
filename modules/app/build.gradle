@@ -4,7 +4,7 @@ apply plugin: 'com.enonic.defaults'
 apply plugin: 'com.enonic.xp.app'
 
 base {
-    archivesName = 'contentstudio'
+    archivesName = 'hackathon'
 }
 
 app {
