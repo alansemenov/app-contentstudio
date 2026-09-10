@@ -24,6 +24,7 @@ apis:
   - "com.enonic.xp.app.main:events"
 interfaces:
   - "contentstudio.menuitem"
+  - "hackathon.menuitem"
   - "contentstudio.contextpanel"
   - "contentstudio.liveview"
   - "contentstudio.customselector"

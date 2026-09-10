@@ -2,6 +2,7 @@ import { ApplicationEvent, ApplicationEventType } from '@enonic/lib-admin-ui/app
 import { Extension, ExtensionConfig } from '@enonic/lib-admin-ui/extension/Extension';
 import { i18n } from '@enonic/lib-admin-ui/util/Messages';
 import { computed, map } from 'nanostores';
+import { ResultAsync } from 'neverthrow';
 import { UrlAction } from '../../../../app/UrlAction';
 import { $config } from '../../../shared/config/config.store';
 import { fetchExtensions } from '../../../entities/extension';
@@ -41,12 +42,22 @@ export function isDefaultWidget(widget: Readonly<Extension>): boolean {
     return firstWidget != null && getWidgetKey(firstWidget) === getWidgetKey(widget);
 }
 
+function getOwnWidgetKey(name: string): string {
+    return `${$config.get().appId}:${name}`;
+}
+
 export function isMainWidget(widget: Readonly<Extension> | undefined): boolean {
-    return getWidgetKey(widget)?.endsWith('studio:main') ?? false;
+    return getWidgetKey(widget) === getOwnWidgetKey('main');
 }
 
 export function isSettingsWidget(widget: Readonly<Extension> | undefined): boolean {
-    return getWidgetKey(widget)?.endsWith('studio:settings') ?? false;
+    return getWidgetKey(widget) === getOwnWidgetKey('settings');
+}
+
+// Settings extensions of sibling Content Studio installations on the same XP
+// declare the shared menu item interface too; only this app's own belongs here.
+function isForeignSettingsWidget(widget: Readonly<Extension>): boolean {
+    return (getWidgetKey(widget)?.endsWith(':settings') ?? false) && !isSettingsWidget(widget);
 }
 
 export function getSettingsWidget(
@@ -59,7 +70,9 @@ export function getSettingsWidget(
 // * Internal
 //
 
-const WIDGET_INTERFACE = 'contentstudio.menuitem';
+// Third-party menu items target the Content Studio interface; this app's own
+// settings extension uses a private one so sibling installations do not list it.
+const WIDGET_INTERFACES = ['contentstudio.menuitem', 'hackathon.menuitem'];
 let isLoading = false;
 let needsReload = false;
 
@@ -72,12 +85,12 @@ async function loadWidgets(): Promise<void> {
     isLoading = true;
 
     try {
-        const result = await fetchExtensions(WIDGET_INTERFACE);
+        const result = await ResultAsync.combine(WIDGET_INTERFACES.map((name) => fetchExtensions(name)));
 
         if (result.isErr()) {
             console.error(result.error);
         } else {
-            const widgets = [createStudioWidget(), ...result.value];
+            const widgets = [createStudioWidget(), ...result.value.flat()].filter((w) => !isForeignSettingsWidget(w));
 
             $sidebarWidgets.setKey('widgets', sortWidgets(widgets));
 
@@ -122,20 +135,13 @@ function updateActiveWidget(): void {
 }
 
 function sortWidgets(widgets: Readonly<Extension>[]): Readonly<Extension>[] {
-    const MAIN_APP_ENDING: string = 'studio:main';
     const ARCHIVE_APP_ENDING: string = 'plus:archive';
-    const SETTINGS_APP_ENDING: string = 'studio:settings';
 
-    const mainWidget = widgets.find((w) => w.getDescriptorKey().toString().endsWith(MAIN_APP_ENDING));
+    const mainWidget = widgets.find((w) => isMainWidget(w));
     const archiveWidget = widgets.find((w) => w.getDescriptorKey().toString().endsWith(ARCHIVE_APP_ENDING));
-    const settingsWidget = widgets.find((w) => w.getDescriptorKey().toString().endsWith(SETTINGS_APP_ENDING));
+    const settingsWidget = widgets.find((w) => isSettingsWidget(w));
     const defaultWidgets = widgets.filter((w) => {
-        const widgetKey = getWidgetKey(w);
-        return (
-            !widgetKey.endsWith(MAIN_APP_ENDING) &&
-            !widgetKey.endsWith(ARCHIVE_APP_ENDING) &&
-            !widgetKey.endsWith(SETTINGS_APP_ENDING)
-        );
+        return !isMainWidget(w) && !getWidgetKey(w).endsWith(ARCHIVE_APP_ENDING) && !isSettingsWidget(w);
     });
     const sortedDefaultWidgets = defaultWidgets.sort((wa, wb) => {
         return wa.getDescriptorKey().toString().localeCompare(wb.getDescriptorKey().toString());

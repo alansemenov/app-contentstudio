@@ -6,4 +6,4 @@ description:
   text: "Configure Projects, Layers"
   i18n: "admin.tool.settings.description"
 interfaces:
-  - "contentstudio.menuitem"
+  - "hackathon.menuitem"
