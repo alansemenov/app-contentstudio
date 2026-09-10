@@ -230,8 +230,9 @@ Behaviour:
   - Name: the spoken name with its first letter capitalized becomes the display name; the path name stays
     unnamed so the wizard generates it from the display name on save.
   - Creates through the legacy `CreateContentRequest` (unnamed, workflow in progress) and opens
-    `/edit/<id>?displayAsNew` in a new tab via `ContentUrlHelper.openEditContentTab`. The reply names the type
-    and, when given, the display name and the parent's display name.
+    `/edit/<id>?displayAsNew` in a new tab via `ContentUrlHelper.openEditContentTab`, then reveals the new item
+    in the browse tree with `revealContentByPath` (expands the parent chain, selects and scrolls to it). The
+    reply names the type and, when given, the display name and the parent's display name.
 - The edit tab is opened outside a user gesture, so browsers may block it as a pop-up; Content Studio then
   shows its standard pop-up warning. Allow pop-ups for the admin origin when demoing.
 - Both commands are dialog-mode only.

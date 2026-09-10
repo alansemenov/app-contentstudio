@@ -14,6 +14,7 @@ const { mocks } = vi.hoisted(() => ({
         getCurrentItems: vi.fn(),
         getActiveProject: vi.fn(),
         findContentByName: vi.fn(),
+        revealContentByPath: vi.fn(),
     },
 }));
 
@@ -47,6 +48,7 @@ vi.mock('../../../../app/content/ContentPath', () => ({
 
 vi.mock('../../../entities/content', () => ({
     getCurrentItems: mocks.getCurrentItems,
+    revealContentByPath: mocks.revealContentByPath,
 }));
 
 vi.mock('../../../entities/project', () => ({
@@ -128,7 +130,7 @@ describe('toDisplayName', () => {
 });
 
 describe('createContentCommand', () => {
-    const created = { getContentId: () => 'new-id' };
+    const created = { getContentId: () => 'new-id', getPath: () => ({ toString: () => '/news/new' }) };
 
     const run = (text: string) => {
         const args = createContentCommand.match(text, context)!;
@@ -150,6 +152,7 @@ describe('createContentCommand', () => {
         mocks.setDisplayName.mockReturnValue(request);
         mocks.makeNewContentRequest.mockReturnValue(request);
         mocks.findContentByName.mockResolvedValue({ kind: 'none' });
+        mocks.revealContentByPath.mockResolvedValue(undefined);
     });
 
     it('should create the content at the root and open it for editing as new', async () => {
@@ -198,6 +201,7 @@ describe('createContentCommand', () => {
         expect(mocks.findContentByName).toHaveBeenCalledWith('news');
         expect(mocks.getAvailableContentTypes).toHaveBeenCalledWith({ contentId: 'news-id', project: 'PROJECT' });
         expect(mocks.setParent).toHaveBeenCalledWith('NEWS_PATH');
+        expect(mocks.revealContentByPath).toHaveBeenCalledWith('/news/new');
         expect(reply).toEqual({ say: 'juke.reply.content.creatingUnder|Article|News' });
     });
 
@@ -236,6 +240,7 @@ describe('createContentCommand', () => {
         const reply = await run('create a new blog');
 
         expect(mocks.openEditContentTab).not.toHaveBeenCalled();
+        expect(mocks.revealContentByPath).not.toHaveBeenCalled();
         expect(reply).toEqual({ say: 'juke.reply.content.failed|Blog Post' });
     });
 });

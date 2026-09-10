@@ -7,7 +7,7 @@ import { ContentHelper } from '../../../../app/util/ContentHelper';
 import { ContentTypesHelper } from '../../../../app/util/ContentTypesHelper';
 import { ContentUrlHelper } from '../../../../app/util/ContentUrlHelper';
 import { ContentEditParams } from '../../../../app/wizard/ContentEditParams';
-import { getCurrentItems } from '../../../entities/content';
+import { getCurrentItems, revealContentByPath } from '../../../entities/content';
 import { getActiveProject } from '../../../entities/project';
 import type { JukeCommand, JukeReply } from './command.types';
 import { findContentByName } from './content-lookup';
@@ -152,6 +152,8 @@ export const createContentCommand: JukeCommand<CreateArgs> = {
             ContentUrlHelper.openEditContentTab(
                 ContentEditParams.create(content.getContentId()).setDisplayAsNew(true).build(),
             );
+            // Expands the parent chain in the browse tree and highlights the new item.
+            await revealContentByPath(content.getPath().toString()).catch(() => undefined);
         } catch (error) {
             console.error('[juke] content creation failed', error);
             return { say: i18n('juke.reply.content.failed', type.getTitle()) };
