@@ -29,6 +29,7 @@ is not used functionally, only as a gate.
 | Delivery | Feature branch `juke-voice` off `master`, one or a few commits per milestone. Jar renamed to `hackathon.jar` (done). | User choice. |
 | Code location | All new code under `modules/lib/src/main/resources/assets/js/v6/features/juke/` (Preact, strict TS, Tailwind, nanostores). Legacy `app/` is called into, never extended. | Project CLAUDE.md. |
 | Localization | All spoken and displayed strings in `phrases.properties` under `juke.*` keys. | Project convention. |
+| Hackathon branding | App and admin tool display name is "AI Hackathon" (descriptors and all `phrases*.properties` locales). `admin/tools/main/main.svg` and `application.svg` show the Content Studio tree with the Juke head as a bottom-right badge. Jar is `hackathon.jar`. | User request on 2026-09-10, to tell this build apart from the original Content Studio on the same XP. |
 | Build tests | `hackathonTestsOnly=true` in `gradle.properties` disables all Java `Test` tasks in `modules/app` and limits the Gradle `pnpmTest` task to `features/juke`. Set to `false` to restore the full suite. | User request on 2026-09-10 to keep hackathon builds fast; temporary. |
 
 ## 3. Runtime and constraints

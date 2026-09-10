@@ -1,6 +1,6 @@
 kind: "AdminTool"
 title:
-  text: "Content Studio"
+  text: "AI Hackathon"
   i18n: "admin.tool.displayName"
 description:
   text: "Manage content and sites"
