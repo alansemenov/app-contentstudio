@@ -202,28 +202,42 @@ Phrases:
 - `juke.reply.project.switching=Switching to {0}`
 - `juke.reply.project.notFound=I cannot find project {0} in the system. Please try a different project.`
 - `juke.reply.content.creating=Creating a new {0}`
+- `juke.reply.content.creatingNamed=Creating a new {0} called {1}`
+- `juke.reply.content.creatingUnder=Creating a new {0} under {1}`
+- `juke.reply.content.creatingNamedUnder=Creating a new {0} called {1} under {2}`
 - `juke.reply.content.typeNotFound=I cannot find {0} in the system. Make sure it exists.`
+- `juke.reply.content.parentNotFound=I cannot find {0} in the current project. Please try a different parent.`
+- `juke.reply.content.parentAmbiguous=I found several items matching {0}. Please be more specific.`
 - `juke.reply.content.failed=I could not create a new {0}. Please try again.`
 
 Behaviour:
 - Matching (`commands/matching.ts`, `bestUniqueMatch`): labels and the spoken name are normalized; tiers are
   tried in order — exact, label starts with spoken, containment either way, every spoken word in the label —
   and the first tier with hits decides. More than one hit is ambiguous and reported as not found.
+- Content lookup (`commands/content-lookup.ts`, `findContentByName`): runs the browse filter's free-text query
+  (fulltext + ngram over `displayName^5`, `_name^3`, `_allText`, draft branch, current project, 50 hits) via
+  `queryContent`, then applies `bestUniqueMatch` over display name and name. Shared with Move in M4.
 - "Go to <name>" (also "switch to", "open", "change to", "navigate to"; optional leading "the" and trailing
   "project") matches against project display names and ids from `$projects`, calls `selectProject` without
   opening the dialog and answers with the project's display name.
-- "Create a new <type>" (also "create", "make", "add", with optional "a"/"an"/"new") lists the content types the
-  New Content dialog would show for the parent — the single selected item, else the project root — via
-  `ContentTypesHelper.getAvailableContentTypes`, minus media types. The spoken name is matched against the type
-  title and local name. On a match it POSTs `content/create` through the legacy `CreateContentRequest`
-  (unnamed, empty display name, workflow in progress) and opens `/edit/<id>?displayAsNew` in a new tab via
-  `ContentUrlHelper.openEditContentTab`.
+- "Create a new <type> [called <name>] [under <parent>]" — verbs "create", "make", "add", each followed by
+  "a"/"an"/"new"; clauses "called|named|titled <name>" and "under|inside|in|below <parent>" in either order.
+  - Parent: the named content when given (looked up with `findContentByName`; ambiguous or missing parent
+    answers with the parent phrases and creates nothing), else the single selected item, else the project root.
+  - Type: the content types the New Content dialog would show for that parent via
+    `ContentTypesHelper.getAvailableContentTypes`, minus media types, matched against title and local name.
+  - Name: the spoken name with its first letter capitalized becomes the display name; the path name stays
+    unnamed so the wizard generates it from the display name on save.
+  - Creates through the legacy `CreateContentRequest` (unnamed, workflow in progress) and opens
+    `/edit/<id>?displayAsNew` in a new tab via `ContentUrlHelper.openEditContentTab`. The reply names the type
+    and, when given, the display name and the parent's display name.
 - The edit tab is opened outside a user gesture, so browsers may block it as a pop-up; Content Studio then
   shows its standard pop-up warning. Allow pop-ups for the admin origin when demoing.
 - Both commands are dialog-mode only.
 
-Tests: parser patterns, matcher tiers and ambiguity, project switch and not-found, content creation at root and
-under a selected parent, media exclusion, creation failure.
+Tests: parser patterns including clause order, matcher tiers and ambiguity, content lookup query and
+narrowing, project switch and not-found, content creation at root, under a selected parent, under a named
+parent, with a display name, media exclusion, parent not found / ambiguous, creation failure.
 
 ### Milestone 3 — Search and selection
 
@@ -275,7 +289,7 @@ Acceptance:
 - Edit: one edit tab per selected item.
 - Delete: confirmation prompt with display name or count; "yes" executes delete/archive through the delete
   feature API and speaks done; "no"/"cancel" does nothing.
-- Move: asks where; a keyword answer runs free-text `content/query` in the current project; exactly one hit
+- Move: asks where; a keyword answer uses `findContentByName` (M2) in the current project; a unique match
   moves the selection under it and speaks done; zero or several hits answer with the unknown reply; "cancel"
   does nothing. Selected items themselves are excluded from parent candidates.
 - Duplicate: asks about children; yes/no duplicates with or without children and speaks the matching reply;
