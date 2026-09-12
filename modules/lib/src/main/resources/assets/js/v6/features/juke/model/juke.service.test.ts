@@ -175,7 +175,7 @@ describe('juke.service', () => {
         await hear('hello juke');
         await finishSpeaking();
 
-        await hear('make me a sandwich');
+        await hear('sing me a song');
 
         expect(speeches).toHaveLength(1);
         expect(speeches[0].text).toBe('juke.reply.unknown');

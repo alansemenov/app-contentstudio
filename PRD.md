@@ -101,14 +101,17 @@ Within `dialog`, a `PendingPrompt` narrows what the next utterance means:
 
 | Pending prompt | Set by | Accepts |
 |---|---|---|
+| `createParent` | "Create a <type>" | root phrases, cancel, or a parent display name |
+| `createName` | parent accepted | cancel, or any phrase as the new display name |
 | `search` | "New search" | filter phrases and keywords until a search is performed |
 | `showResults` | search finished with hits | "yes" (apply filter and open panel) or anything else (dismiss) |
 | `confirmDelete` | "Delete" | yes / no / cancel |
 | `moveTarget` | "Move" | cancel or a display-name keyword |
 | `duplicateChildren` | "Duplicate" | yes / no / cancel |
 
-Session commands ("goodbye juke") always win over pending prompts. An unrecognized phrase in a pending prompt
-cancels the prompt (except `search`, where it becomes free-text keywords) and answers with the fallback phrase.
+Session commands ("goodbye juke", "hello juke") always win over pending prompts. Commands that only make sense
+without a pending prompt declare `prompts: [null]`; prompt commands declare their prompt and typically accept any
+phrase, so nothing falls through to the unknown reply while a question is open.
 
 ### 4.2 Recognizer behaviour
 
@@ -203,14 +206,17 @@ Not verified manually yet: needs an XP with the Juke Operator running and `hacka
 Phrases:
 - `juke.reply.project.switching=Switching to {0}`
 - `juke.reply.project.notFound=I cannot find project {0} in the system. Please try a different project.`
-- `juke.reply.content.creating=Creating a new {0}`
-- `juke.reply.content.creatingNamed=Creating a new {0} called {1}`
-- `juke.reply.content.creatingUnder=Creating a new {0} under {1}`
-- `juke.reply.content.creatingNamedUnder=Creating a new {0} called {1} under {2}`
-- `juke.reply.content.typeNotFound=I cannot find {0} in the system. Make sure it exists.`
-- `juke.reply.content.parentNotFound=I cannot find {0} in the current project. Please try a different parent.`
-- `juke.reply.content.parentAmbiguous=I found several items matching {0}. Please be more specific.`
-- `juke.reply.content.failed=I could not create a new {0}. Please try again.`
+- `juke.reply.create.typeNotFound=I can't find a content type called {0} in the system. Try again.`
+- `juke.reply.create.askParent=Where do you want to create a new {0}?`
+- `juke.reply.create.parentNotFound=I can't find a content named {0}. Try again.`
+- `juke.reply.create.parentAmbiguous=I found several items named {0}. Try again with a more specific name.`
+- `juke.reply.create.notAllowed=A {0} cannot be created under {1}. Try a different parent.`
+- `juke.reply.create.notAllowedRoot=A {0} cannot be created in the root. Try a different parent.`
+- `juke.reply.create.askName=How do you want to call the new {0}?`
+- `juke.reply.create.creating=Creating a new {0} called {1} under {2}`
+- `juke.reply.create.creatingRoot=Creating a new {0} called {1} in the root`
+- `juke.reply.create.cancelled=Okay. Nothing was created.`
+- `juke.reply.create.failed=I could not create a new {0}. Please try again.`
 
 Behaviour:
 - Matching (`commands/matching.ts`, `bestUniqueMatch`): labels and the spoken name are normalized; tiers are
@@ -223,27 +229,35 @@ Behaviour:
   the hits; parent lookups use `canHoldChildren` (no media, no page templates). Shared with Move in M4.
 - "Go to <name>" (also "switch to", "open", "change to", "navigate to"; optional leading "the" and trailing
   "project") matches against project display names and ids from `$projects`, calls `selectProject` without
-  opening the dialog and answers with the project's display name.
-- "Create a new <type> [called <name>] [under <parent>]" — verbs "create", "make", "add", each followed by
-  "a"/"an"/"new"; clauses "called|named|titled <name>" and "under|inside|below <parent>" in either order ("in" is not a
-  parent word so names like "life in the city" stay intact).
-  - Parent: the named content when given (looked up with `findContentByName`; ambiguous or missing parent
-    answers with the parent phrases and creates nothing), else the single selected item, else the project root.
-  - Type: the content types the New Content dialog would show for that parent via
-    `ContentTypesHelper.getAvailableContentTypes`, minus media types, matched against title and local name.
-  - Name: the spoken name with its first letter capitalized becomes the display name; the path name stays
-    unnamed so the wizard generates it from the display name on save.
-  - Creates through the legacy `CreateContentRequest` (unnamed, workflow in progress) and opens
-    `/edit/<id>?displayAsNew` in a new tab via `ContentUrlHelper.openEditContentTab`, then reveals the new item
-    in the browse tree with `revealContentByPath` (expands the parent chain, selects and scrolls to it). The
-    reply names the type and, when given, the display name and the parent's display name.
+  opening the dialog and answers with the project's display name. Only when no prompt is pending.
+- Content creation is a three-step dialog (`commands/content.commands.ts`, state in
+  `model/createFlow.store.ts`):
+  1. "Create a <type>" (verbs "create", "make", "add", "new", optional "a"/"an"/"new"). The type is matched
+     against all non-abstract, non-media content types (`schema/content/all`) by title and local name. Not
+     found: type-not-found reply, no prompt. Found: "Where do you want to create a new <Type>?" and prompt
+     `createParent`.
+  2. In `createParent`: "root", "in the root", "at the root", "project root" → root. "cancel"/"never mind"
+     → cancelled reply, dialog closed. Anything else (optionally prefixed "under|in|inside|below|into [the]")
+     is a parent display name resolved with `findContentByName` + `canHoldChildren`. Not found or ambiguous:
+     the matching reply, prompt stays. Then the allowed types for that parent are fetched
+     (`ContentTypesHelper.getAvailableContentTypes` with the parent id, or none for root); if the type is not
+     allowed there Juke says so and keeps asking. Otherwise "How do you want to call the new <Type>?" and prompt
+     `createName`.
+  3. In `createName`: "cancel" → cancelled. Any other phrase is the name (first letter capitalized). Juke
+     creates through the legacy `CreateContentRequest` (unnamed path, display name set, workflow in progress),
+     opens `/edit/<id>?displayAsNew` in a new tab, reveals the item in the browse tree with
+     `revealContentByPath`, and confirms "Creating a new <Type> called <Name> under <Parent>" or "... in the
+     root". Failure: failed reply, dialog closed.
+- While a prompt is pending only the prompt's own command and the session commands ("goodbye juke", "hello
+  juke") are recognized; small talk and "go to" are restricted to the no-prompt state so that any phrase can be
+  a name or a parent. Hello, goodbye and Juke turning off reset the create flow.
 - The edit tab is opened outside a user gesture, so browsers may block it as a pop-up; Content Studio then
   shows its standard pop-up warning. Allow pop-ups for the admin origin when demoing.
-- Both commands are dialog-mode only.
 
-Tests: parser patterns including clause order, matcher tiers and ambiguity, content lookup query and
-narrowing, project switch and not-found, content creation at root, under a selected parent, under a named
-parent, with a display name, media exclusion, parent not found / ambiguous, creation failure.
+Tests: start/parent/name parsers, matcher tiers and ambiguity, content lookup query and narrowing, project
+switch and not-found, and the create dialog end to end through the registry: type not found, named parent,
+root parent, unknown/ambiguous/disallowed parent, naming and creation, cancel at each step, goodbye during a
+prompt, creation failure.
 
 ### Milestone 3 — Search and selection
 

@@ -1,25 +1,43 @@
+import { okAsync, errAsync } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContentTypeSummary } from '@enonic/lib-admin-ui/schema/content/ContentTypeSummary';
-import type { JukeContext } from './command.types';
-import { createContentCommand, findContentType, parseCreate, toDisplayName } from './content.commands';
+import { $createFlow, resetCreateFlow } from '../model/createFlow.store';
+import { clearCommands, registerCommands, resolveCommand } from './command.registry';
+import type { JukeContext, JukeReply } from './command.types';
+import {
+    contentCommands,
+    createNameCommand,
+    createParentCommand,
+    createStartCommand,
+    findContentType,
+    parseCreateParent,
+    parseCreateStart,
+    toDisplayName,
+} from './content.commands';
+import { sessionCommands } from './session.commands';
+import { smallTalkCommands } from './smalltalk.commands';
 
 const { mocks } = vi.hoisted(() => ({
     mocks: {
+        fetchAllContentTypes: vi.fn(),
         getAvailableContentTypes: vi.fn(),
         sendAndParse: vi.fn(),
         setParent: vi.fn(),
         setDisplayName: vi.fn(),
         makeNewContentRequest: vi.fn(),
         openEditContentTab: vi.fn(),
-        getCurrentItems: vi.fn(),
+        revealContentByPath: vi.fn(),
         getActiveProject: vi.fn(),
         findContentByName: vi.fn(),
-        revealContentByPath: vi.fn(),
     },
 }));
 
 vi.mock('@enonic/lib-admin-ui/util/Messages', () => ({
     i18n: (key: string, ...args: unknown[]) => [key, ...args].join('|'),
+}));
+
+vi.mock('../../../entities/schema/api/contentTypes.api', () => ({
+    fetchAllContentTypes: mocks.fetchAllContentTypes,
 }));
 
 vi.mock('../../../../app/util/ContentTypesHelper', () => ({
@@ -47,7 +65,6 @@ vi.mock('../../../../app/content/ContentPath', () => ({
 }));
 
 vi.mock('../../../entities/content', () => ({
-    getCurrentItems: mocks.getCurrentItems,
     revealContentByPath: mocks.revealContentByPath,
 }));
 
@@ -60,18 +77,26 @@ vi.mock('./content-lookup', () => ({
     canHoldChildren: () => true,
 }));
 
-const type = (localName: string, title: string, media = false): ContentTypeSummary => {
+const type = (
+    localName: string,
+    title: string,
+    options: { media?: boolean; abstract?: boolean } = {},
+): ContentTypeSummary => {
     const contentTypeName = {
         getLocalName: () => localName,
-        isDescendantOfMedia: () => media,
+        isDescendantOfMedia: () => options.media === true,
         toString: () => `com.example:${localName}`,
     };
-    return { getTitle: () => title, getContentTypeName: () => contentTypeName } as unknown as ContentTypeSummary;
+    return {
+        getTitle: () => title,
+        isAbstract: () => options.abstract === true,
+        getContentTypeName: () => contentTypeName,
+    } as unknown as ContentTypeSummary;
 };
 
-const types = [type('blog-post', 'Blog Post'), type('article', 'Article'), type('image', 'Image', true)];
-
-const context: JukeContext = { mode: 'dialog', prompt: null, userName: 'Alan' };
+const blog = type('blog-post', 'Blog Post');
+const article = type('article', 'Article');
+const allTypes = [blog, article, type('image', 'Image', { media: true }), type('base', 'Base', { abstract: true })];
 
 const summary = (id: string, displayName: string, path: string) => ({
     getContentId: () => id,
@@ -79,47 +104,66 @@ const summary = (id: string, displayName: string, path: string) => ({
     getPath: () => path,
 });
 
-describe('parseCreate', () => {
+const context = (prompt: JukeContext['prompt'] = null): JukeContext => ({ mode: 'dialog', prompt, userName: 'Alan' });
+
+const runResolved = async (text: string, prompt: JukeContext['prompt'] = null): Promise<JukeReply | null> => {
+    const resolved = resolveCommand([text], context(prompt));
+    if (resolved == null) {
+        return null;
+    }
+    return resolved.command.run(resolved.args, context(prompt));
+};
+
+describe('parseCreateStart', () => {
     it.each([
-        ['create a new blog', { typeName: 'blog' }],
-        ['create new blog post', { typeName: 'blog post' }],
-        ['create an article', { typeName: 'article' }],
-        ['make a new folder', { typeName: 'folder' }],
-        ['add a person', { typeName: 'person' }],
-        ['create a new blog called summer news', { typeName: 'blog', displayName: 'summer news' }],
-        ['create a new blog named summer news', { typeName: 'blog', displayName: 'summer news' }],
-        ['create a new article under superhero', { typeName: 'article', parentName: 'superhero' }],
-        ['create a new article inside the news folder', { typeName: 'article', parentName: 'the news folder' }],
-        ['create a new blog called life in the city', { typeName: 'blog', displayName: 'life in the city' }],
-        [
-            'create a new blog called summer news under superhero',
-            { typeName: 'blog', displayName: 'summer news', parentName: 'superhero' },
-        ],
-        [
-            'create a new blog under superhero called summer news',
-            { typeName: 'blog', displayName: 'summer news', parentName: 'superhero' },
-        ],
-    ])('should parse "%s"', (text, expected) => {
-        expect(parseCreate(text)).toEqual(expected);
+        ['create a blog', 'blog'],
+        ['create a new blog post', 'blog post'],
+        ['create an article', 'article'],
+        ['make a folder', 'folder'],
+        ['add a person', 'person'],
+        ['new blog', 'blog'],
+    ])('should parse "%s" as type "%s"', (text, typeName) => {
+        expect(parseCreateStart(text)).toEqual({ typeName });
     });
 
     it('should ignore unrelated phrases', () => {
-        expect(parseCreate('go to superhero')).toBeNull();
-        expect(parseCreate('create')).toBeNull();
-        expect(parseCreate('make me a sandwich')).toBeNull();
-        expect(parseCreate('create blog')).toBeNull();
+        expect(parseCreateStart('go to superhero')).toBeNull();
+        expect(parseCreateStart('create')).toBeNull();
+    });
+});
+
+describe('parseCreateParent', () => {
+    it.each(['root', 'the root', 'in the root', 'at the root', 'under root', 'in the project root', 'root folder'])(
+        'should treat "%s" as the root',
+        (text) => {
+            expect(parseCreateParent(text)).toEqual({ kind: 'root' });
+        },
+    );
+
+    it.each([
+        ['under blogs', 'blogs'],
+        ['in the news folder', 'news folder'],
+        ['inside superhero', 'superhero'],
+        ['blogs', 'blogs'],
+    ])('should take "%s" as parent "%s"', (text, name) => {
+        expect(parseCreateParent(text)).toEqual({ kind: 'named', name });
+    });
+
+    it('should recognize cancel', () => {
+        expect(parseCreateParent('cancel')).toEqual({ kind: 'cancel' });
+        expect(parseCreateParent('never mind')).toEqual({ kind: 'cancel' });
     });
 });
 
 describe('findContentType', () => {
     it('should match by title or local name', () => {
-        expect(findContentType(types, 'blog')?.getTitle()).toBe('Blog Post');
-        expect(findContentType(types, 'article')?.getTitle()).toBe('Article');
-        expect(findContentType(types, 'blog-post')?.getTitle()).toBe('Blog Post');
+        expect(findContentType(allTypes, 'blog')?.getTitle()).toBe('Blog Post');
+        expect(findContentType(allTypes, 'article')?.getTitle()).toBe('Article');
+        expect(findContentType(allTypes, 'blog-post')?.getTitle()).toBe('Blog Post');
     });
 
     it('should return null for unknown names', () => {
-        expect(findContentType(types, 'recipe')).toBeNull();
+        expect(findContentType(allTypes, 'recipe')).toBeNull();
     });
 });
 
@@ -130,19 +174,19 @@ describe('toDisplayName', () => {
     });
 });
 
-describe('createContentCommand', () => {
-    const created = { getContentId: () => 'new-id', getPath: () => ({ toString: () => '/news/new' }) };
-
-    const run = (text: string) => {
-        const args = createContentCommand.match(text, context)!;
-        return createContentCommand.run(args, context);
-    };
+describe('create dialog', () => {
+    const created = { getContentId: () => 'new-id', getPath: () => ({ toString: () => '/blogs/new' }) };
+    const blogs = summary('blogs-id', 'Blogs', 'BLOGS_PATH');
 
     beforeEach(() => {
         Object.values(mocks).forEach((mock) => mock.mockReset());
-        mocks.getAvailableContentTypes.mockResolvedValue(types);
+        resetCreateFlow();
+        clearCommands();
+        registerCommands(...sessionCommands, ...smallTalkCommands, ...contentCommands);
+
+        mocks.fetchAllContentTypes.mockReturnValue(okAsync(allTypes));
+        mocks.getAvailableContentTypes.mockResolvedValue([blog, article]);
         mocks.getActiveProject.mockReturnValue('PROJECT');
-        mocks.getCurrentItems.mockReturnValue([]);
         mocks.sendAndParse.mockResolvedValue(created);
         const request = {
             setParent: mocks.setParent,
@@ -152,96 +196,148 @@ describe('createContentCommand', () => {
         mocks.setParent.mockReturnValue(request);
         mocks.setDisplayName.mockReturnValue(request);
         mocks.makeNewContentRequest.mockReturnValue(request);
-        mocks.findContentByName.mockResolvedValue({ kind: 'none' });
+        mocks.findContentByName.mockResolvedValue({ kind: 'match', value: blogs });
         mocks.revealContentByPath.mockResolvedValue(undefined);
     });
 
-    it('should create the content at the root and open it for editing as new', async () => {
-        const reply = await run('create a new blog');
+    it('should ask where to create after resolving the type', async () => {
+        const reply = await runResolved('create a blog');
 
+        expect(reply).toEqual({ say: 'juke.reply.create.askParent|Blog Post', prompt: 'createParent' });
+        expect($createFlow.get()?.type).toBe(blog);
+    });
+
+    it('should not offer media or abstract types and ask to try again', async () => {
+        expect(await runResolved('create an image')).toEqual({ say: 'juke.reply.create.typeNotFound|image' });
+        expect(await runResolved('create a base')).toEqual({ say: 'juke.reply.create.typeNotFound|base' });
+        expect($createFlow.get()).toBeNull();
+    });
+
+    it('should resolve a named parent, check the type is allowed and ask for the name', async () => {
+        await runResolved('create a blog');
+
+        const reply = await runResolved('under blogs', 'createParent');
+
+        expect(mocks.findContentByName).toHaveBeenCalledWith('blogs', { accept: expect.any(Function) });
+        expect(mocks.getAvailableContentTypes).toHaveBeenCalledWith({ contentId: 'blogs-id', project: 'PROJECT' });
+        expect(reply).toEqual({ say: 'juke.reply.create.askName|Blog Post', prompt: 'createName' });
+        expect($createFlow.get()?.parent).toBe(blogs);
+    });
+
+    it('should accept the root as parent', async () => {
+        await runResolved('create a blog');
+
+        const reply = await runResolved('in the root', 'createParent');
+
+        expect(mocks.findContentByName).not.toHaveBeenCalled();
         expect(mocks.getAvailableContentTypes).toHaveBeenCalledWith({ contentId: undefined, project: 'PROJECT' });
-        expect(mocks.makeNewContentRequest).toHaveBeenCalledWith(types[0].getContentTypeName());
-        expect(mocks.setParent).toHaveBeenCalledWith('ROOT');
-        expect(mocks.setDisplayName).not.toHaveBeenCalled();
-        expect(mocks.openEditContentTab).toHaveBeenCalledWith({ contentId: 'new-id', displayAsNew: true });
-        expect(reply).toEqual({ say: 'juke.reply.content.creating|Blog Post' });
+        expect(reply).toEqual({ say: 'juke.reply.create.askName|Blog Post', prompt: 'createName' });
+        expect($createFlow.get()?.parent).toBeUndefined();
     });
 
-    it('should create under the single selected item', async () => {
-        mocks.getCurrentItems.mockReturnValue([summary('parent-id', 'Parent', 'PARENT_PATH')]);
+    it('should keep asking when the parent is unknown, ambiguous or disallows the type', async () => {
+        await runResolved('create a blog');
 
-        const reply = await run('create a new article');
-
-        expect(mocks.getAvailableContentTypes).toHaveBeenCalledWith({ contentId: 'parent-id', project: 'PROJECT' });
-        expect(mocks.setParent).toHaveBeenCalledWith('PARENT_PATH');
-        expect(reply).toEqual({ say: 'juke.reply.content.creating|Article' });
-    });
-
-    it('should use the root when several items are selected', async () => {
-        mocks.getCurrentItems.mockReturnValue([summary('a', 'A', 'A'), summary('b', 'B', 'B')]);
-
-        await run('create a new article');
-
-        expect(mocks.setParent).toHaveBeenCalledWith('ROOT');
-    });
-
-    it('should set the display name when a name is given', async () => {
-        const reply = await run('create a new blog called summer news');
-
-        expect(mocks.setDisplayName).toHaveBeenCalledWith('Summer news');
-        expect(reply).toEqual({ say: 'juke.reply.content.creatingNamed|Blog Post|Summer news' });
-    });
-
-    it('should look up the parent by name and create under it', async () => {
-        const parent = summary('news-id', 'News', 'NEWS_PATH');
-        mocks.getCurrentItems.mockReturnValue([summary('sel', 'Selected', 'SELECTED_PATH')]);
-        mocks.findContentByName.mockResolvedValue({ kind: 'match', value: parent });
-
-        const reply = await run('create a new article under news');
-
-        expect(mocks.findContentByName).toHaveBeenCalledWith('news', { accept: expect.any(Function) });
-        expect(mocks.getAvailableContentTypes).toHaveBeenCalledWith({ contentId: 'news-id', project: 'PROJECT' });
-        expect(mocks.setParent).toHaveBeenCalledWith('NEWS_PATH');
-        expect(mocks.revealContentByPath).toHaveBeenCalledWith('/news/new');
-        expect(reply).toEqual({ say: 'juke.reply.content.creatingUnder|Article|News' });
-    });
-
-    it('should combine name and parent', async () => {
-        mocks.findContentByName.mockResolvedValue({ kind: 'match', value: summary('news-id', 'News', 'NEWS_PATH') });
-
-        const reply = await run('create a new blog called summer news under news');
-
-        expect(mocks.setDisplayName).toHaveBeenCalledWith('Summer news');
-        expect(mocks.setParent).toHaveBeenCalledWith('NEWS_PATH');
-        expect(reply).toEqual({ say: 'juke.reply.content.creatingNamedUnder|Blog Post|Summer news|News' });
-    });
-
-    it('should report an unknown or ambiguous parent without creating', async () => {
         mocks.findContentByName.mockResolvedValueOnce({ kind: 'none' });
-        expect(await run('create a new blog under nowhere')).toEqual({
-            say: 'juke.reply.content.parentNotFound|nowhere',
+        expect(await runResolved('under nowhere', 'createParent')).toEqual({
+            say: 'juke.reply.create.parentNotFound|nowhere',
         });
 
         mocks.findContentByName.mockResolvedValueOnce({ kind: 'ambiguous', values: [] });
-        expect(await run('create a new blog under news')).toEqual({ say: 'juke.reply.content.parentAmbiguous|news' });
+        expect(await runResolved('under news', 'createParent')).toEqual({
+            say: 'juke.reply.create.parentAmbiguous|news',
+        });
 
+        mocks.getAvailableContentTypes.mockResolvedValueOnce([article]);
+        expect(await runResolved('under blogs', 'createParent')).toEqual({
+            say: 'juke.reply.create.notAllowed|Blog Post|Blogs',
+        });
+
+        mocks.getAvailableContentTypes.mockResolvedValueOnce([article]);
+        expect(await runResolved('root', 'createParent')).toEqual({
+            say: 'juke.reply.create.notAllowedRoot|Blog Post',
+        });
+
+        expect($createFlow.get()?.parent).toBeUndefined();
         expect(mocks.makeNewContentRequest).not.toHaveBeenCalled();
     });
 
-    it('should not offer media types and report unknown types', async () => {
-        const reply = await run('create a new image');
+    it('should create with the spoken name under the chosen parent and confirm', async () => {
+        await runResolved('create a blog');
+        await runResolved('under blogs', 'createParent');
 
-        expect(mocks.makeNewContentRequest).not.toHaveBeenCalled();
-        expect(reply).toEqual({ say: 'juke.reply.content.typeNotFound|image' });
+        const reply = await runResolved('summer news', 'createName');
+
+        expect(mocks.makeNewContentRequest).toHaveBeenCalledWith(blog.getContentTypeName());
+        expect(mocks.setParent).toHaveBeenCalledWith('BLOGS_PATH');
+        expect(mocks.setDisplayName).toHaveBeenCalledWith('Summer news');
+        expect(mocks.openEditContentTab).toHaveBeenCalledWith({ contentId: 'new-id', displayAsNew: true });
+        expect(mocks.revealContentByPath).toHaveBeenCalledWith('/blogs/new');
+        expect(reply).toEqual({ say: 'juke.reply.create.creating|Blog Post|Summer news|Blogs', prompt: null });
+        expect($createFlow.get()).toBeNull();
     });
 
-    it('should report a failed creation without opening a tab', async () => {
+    it('should create in the root and say so', async () => {
+        await runResolved('create a blog');
+        await runResolved('in the root', 'createParent');
+
+        const reply = await runResolved('summer news', 'createName');
+
+        expect(mocks.setParent).toHaveBeenCalledWith('ROOT');
+        expect(reply).toEqual({ say: 'juke.reply.create.creatingRoot|Blog Post|Summer news', prompt: null });
+    });
+
+    it('should take any phrase as the name, including ones that look like commands', async () => {
+        await runResolved('create a blog');
+        await runResolved('root', 'createParent');
+
+        await runResolved('how are you', 'createName');
+
+        expect(mocks.setDisplayName).toHaveBeenCalledWith('How are you');
+    });
+
+    it('should cancel at either step', async () => {
+        await runResolved('create a blog');
+        expect(await runResolved('cancel', 'createParent')).toEqual({
+            say: 'juke.reply.create.cancelled',
+            prompt: null,
+        });
+        expect($createFlow.get()).toBeNull();
+
+        await runResolved('create a blog');
+        await runResolved('root', 'createParent');
+        expect(await runResolved('never mind', 'createName')).toEqual({
+            say: 'juke.reply.create.cancelled',
+            prompt: null,
+        });
+        expect(mocks.makeNewContentRequest).not.toHaveBeenCalled();
+    });
+
+    it('should let goodbye win over an open prompt', async () => {
+        await runResolved('create a blog');
+        const resolved = resolveCommand(['goodbye juke'], context('createParent'));
+        expect(resolved?.command.id).toBe('session.goodbye');
+    });
+
+    it('should report a failed creation and leave the dialog', async () => {
+        await runResolved('create a blog');
+        await runResolved('root', 'createParent');
         mocks.sendAndParse.mockRejectedValue(new Error('boom'));
 
-        const reply = await run('create a new blog');
+        const reply = await runResolved('summer news', 'createName');
 
         expect(mocks.openEditContentTab).not.toHaveBeenCalled();
-        expect(mocks.revealContentByPath).not.toHaveBeenCalled();
-        expect(reply).toEqual({ say: 'juke.reply.content.failed|Blog Post' });
+        expect(reply).toEqual({ say: 'juke.reply.create.failed|Blog Post', prompt: null });
+        expect($createFlow.get()).toBeNull();
+    });
+
+    it('should surface a failing type request', async () => {
+        mocks.fetchAllContentTypes.mockReturnValue(errAsync(new Error('offline')));
+
+        await expect(runResolved('create a blog')).rejects.toThrow('offline');
+    });
+
+    it('should expose the three commands in dialog order', () => {
+        expect(contentCommands).toEqual([createStartCommand, createParentCommand, createNameCommand]);
     });
 });

@@ -13,6 +13,7 @@ import {
     type RecognizerHandlers,
 } from '../speech/recognizer';
 import { createSpeaker as defaultCreateSpeaker, type Speaker } from '../speech/speaker';
+import { resetCreateFlow } from './createFlow.store';
 import {
     $jukeAvailable,
     getJukeContext,
@@ -141,6 +142,7 @@ const deactivate = (): void => {
     speaker?.cancel();
     speaker = null;
     resetJukeState();
+    resetCreateFlow();
 };
 
 const handleDenied = (): void => {

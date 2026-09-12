@@ -9,7 +9,14 @@
 
 export type JukeMode = 'off' | 'idle' | 'dialog';
 
-export type JukePrompt = 'search' | 'showResults' | 'confirmDelete' | 'moveTarget' | 'duplicateChildren';
+export type JukePrompt =
+    | 'createParent'
+    | 'createName'
+    | 'search'
+    | 'showResults'
+    | 'confirmDelete'
+    | 'moveTarget'
+    | 'duplicateChildren';
 
 export type JukeContext = {
     mode: JukeMode;

@@ -73,6 +73,7 @@ function toCommand(entry: SmallTalkEntry): JukeCommand<true> {
     return {
         id: entry.id,
         modes: ['dialog'],
+        prompts: [null],
         match: (text: string) => (entry.pattern.test(text) ? true : null),
         run: (_args: true, context: JukeContext) => ({ say: i18n(entry.phraseKey, context.userName) }),
     };

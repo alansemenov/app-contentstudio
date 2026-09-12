@@ -7,61 +7,60 @@ import { ContentHelper } from '../../../../app/util/ContentHelper';
 import { ContentTypesHelper } from '../../../../app/util/ContentTypesHelper';
 import { ContentUrlHelper } from '../../../../app/util/ContentUrlHelper';
 import { ContentEditParams } from '../../../../app/wizard/ContentEditParams';
-import { getCurrentItems, revealContentByPath } from '../../../entities/content';
+import { revealContentByPath } from '../../../entities/content';
 import { getActiveProject } from '../../../entities/project';
+import { fetchAllContentTypes } from '../../../entities/schema/api/contentTypes.api';
+import {
+    $createFlow,
+    resetCreateFlow,
+    setCreateFlowParent,
+    startCreateFlow,
+    type CreateFlow,
+} from '../model/createFlow.store';
 import type { JukeCommand, JukeReply } from './command.types';
 import { canHoldChildren, findContentByName } from './content-lookup';
 import { bestUniqueMatch } from './matching';
 
 //
-// * Content commands
+// * Content creation dialog
 //
-// "Create a new <type> [called <name>] [under <parent>]" creates content of
-// that type and opens it for editing in a new tab. The parent is the named
-// content when given, else the single selected item, else the project root.
-// Candidate types are the ones the New Content dialog would list for that
-// parent: allowed by the parent, minus media types.
+//   User: "Create a blog"           -> type resolved among the project's content types
+//   Juke: "Where do you want to create a new Blog?"          (prompt: createParent)
+//   User: "Under blogs" / "In the root"
+//   Juke: "How do you want to call the new Blog?"            (prompt: createName)
+//   User: "Summer news"
+//   Juke: "Creating a new Blog called Summer news under Blogs"
+//
+// The type must be allowed under the chosen parent; otherwise Juke asks for a
+// different parent. "Cancel" leaves the dialog at any step.
 //
 
-export type CreateArgs = {
-    typeName: string;
-    displayName?: string;
-    parentName?: string;
-};
+export type CreateStartArgs = { typeName: string };
+export type CreateParentArgs = { kind: 'root' } | { kind: 'cancel' } | { kind: 'named'; name: string };
+export type CreateNameArgs = { kind: 'cancel' } | { kind: 'named'; name: string };
 
-const CREATE_PREFIX = /^(?:create|make|add)\s+(?:(?:a|an)\s+(?:new\s+)?|new\s+)(.+)$/;
-const NAME_CLAUSE = /\s+(?:called|named|titled)\s+/;
-const PARENT_CLAUSE = /\s+(?:under|inside|below)\s+/;
+const CREATE_PATTERN = /^(?:create|make|add|new)\s+(?:(?:a|an)\s+)?(?:new\s+)?(.+)$/;
+const CANCEL_PATTERN = /^(?:cancel|never mind|nevermind|stop|forget it|no)$/;
+const ROOT_PATTERN = /^(?:(?:in|at|under|inside|to)\s+)?(?:the\s+)?(?:project\s+)?root(?:\s+(?:folder|level))?$/;
+const PARENT_PREFIX = /^(?:under|in|inside|below|into)\s+(?:the\s+)?/;
 
-// Splits "<type> called <name> under <parent>" (either clause order) into parts.
-function splitClauses(rest: string): CreateArgs {
-    const nameAt = NAME_CLAUSE.exec(rest);
-    const parentAt = PARENT_CLAUSE.exec(rest);
-    const cuts = [
-        nameAt ? { key: 'displayName' as const, index: nameAt.index, length: nameAt[0].length } : null,
-        parentAt ? { key: 'parentName' as const, index: parentAt.index, length: parentAt[0].length } : null,
-    ]
-        .filter((cut) => cut != null)
-        .sort((a, b) => a.index - b.index);
-
-    const args: CreateArgs = { typeName: cuts.length > 0 ? rest.slice(0, cuts[0].index) : rest };
-    cuts.forEach((cut, i) => {
-        const end = i + 1 < cuts.length ? cuts[i + 1].index : rest.length;
-        const value = rest.slice(cut.index + cut.length, end).trim();
-        if (value.length > 0) {
-            args[cut.key] = value;
-        }
-    });
-    return args;
+export function parseCreateStart(text: string): CreateStartArgs | null {
+    const match = CREATE_PATTERN.exec(text);
+    return match ? { typeName: match[1].trim() } : null;
 }
 
-export function parseCreate(text: string): CreateArgs | null {
-    const match = CREATE_PREFIX.exec(text);
-    if (match == null) {
-        return null;
+export function parseCreateParent(text: string): CreateParentArgs {
+    if (CANCEL_PATTERN.test(text)) {
+        return { kind: 'cancel' };
     }
-    const args = splitClauses(match[1].trim());
-    return args.typeName.length > 0 ? args : null;
+    if (ROOT_PATTERN.test(text)) {
+        return { kind: 'root' };
+    }
+    return { kind: 'named', name: text.replace(PARENT_PREFIX, '').trim() || text };
+}
+
+export function parseCreateName(text: string): CreateNameArgs {
+    return CANCEL_PATTERN.test(text) ? { kind: 'cancel' } : { kind: 'named', name: text };
 }
 
 export function findContentType(types: readonly ContentTypeSummary[], spokenName: string): ContentTypeSummary | null {
@@ -77,78 +76,104 @@ export function toDisplayName(spoken: string): string {
     return spoken.charAt(0).toUpperCase() + spoken.slice(1);
 }
 
-type ParentResolution = { parent: ContentSummary | undefined } | { reply: JukeReply };
-
-async function resolveParent(parentName: string | undefined): Promise<ParentResolution> {
-    if (parentName == null) {
-        const items = getCurrentItems();
-        return { parent: items.length === 1 ? items[0] : undefined };
+async function fetchCreatableTypes(): Promise<ContentTypeSummary[]> {
+    const result = await fetchAllContentTypes();
+    if (result.isErr()) {
+        throw result.error;
     }
-    const result = await findContentByName(parentName, { accept: canHoldChildren });
-    if (result.kind === 'match') {
-        return { parent: result.value };
-    }
-    if (result.kind === 'ambiguous') {
-        return { reply: { say: i18n('juke.reply.content.parentAmbiguous', parentName) } };
-    }
-    return { reply: { say: i18n('juke.reply.content.parentNotFound', parentName) } };
+    return result.value.filter((type) => !type.isAbstract() && !type.getContentTypeName().isDescendantOfMedia());
 }
 
-async function fetchCreatableTypes(parent: ContentSummary | undefined): Promise<ContentTypeSummary[]> {
-    const types = await ContentTypesHelper.getAvailableContentTypes({
+async function isTypeAllowedUnder(type: ContentTypeSummary, parent: ContentSummary | undefined): Promise<boolean> {
+    const allowed = await ContentTypesHelper.getAvailableContentTypes({
         contentId: parent?.getContentId(),
         project: getActiveProject(),
     });
-    return types.filter((type) => !type.getContentTypeName().isDescendantOfMedia());
+    const wanted = type.getContentTypeName().toString();
+    return allowed.some((candidate) => candidate.getContentTypeName().toString() === wanted);
 }
 
-async function createContent(
-    type: ContentTypeSummary,
-    parent: ContentSummary | undefined,
-    displayName: string | undefined,
-): Promise<Content> {
-    const parentPath = parent != null ? parent.getPath() : ContentPath.getRoot();
-    const request = ContentHelper.makeNewContentRequest(type.getContentTypeName()).setParent(parentPath);
-    if (displayName != null) {
-        request.setDisplayName(displayName);
-    }
-    return request.sendAndParse();
+async function createContent(flow: CreateFlow, displayName: string): Promise<Content> {
+    const parentPath = flow.parent != null ? flow.parent.getPath() : ContentPath.getRoot();
+    return ContentHelper.makeNewContentRequest(flow.type.getContentTypeName())
+        .setParent(parentPath)
+        .setDisplayName(displayName)
+        .sendAndParse();
 }
 
-function creatingReply(type: ContentTypeSummary, displayName?: string, parent?: ContentSummary): JukeReply {
-    const title = type.getTitle();
-    if (displayName != null && parent != null) {
-        return { say: i18n('juke.reply.content.creatingNamedUnder', title, displayName, parent.getDisplayName()) };
-    }
-    if (displayName != null) {
-        return { say: i18n('juke.reply.content.creatingNamed', title, displayName) };
-    }
-    if (parent != null) {
-        return { say: i18n('juke.reply.content.creatingUnder', title, parent.getDisplayName()) };
-    }
-    return { say: i18n('juke.reply.content.creating', title) };
-}
+const cancelled = (): JukeReply => {
+    resetCreateFlow();
+    return { say: i18n('juke.reply.create.cancelled'), prompt: null };
+};
 
-export const createContentCommand: JukeCommand<CreateArgs> = {
-    id: 'content.create',
+export const createStartCommand: JukeCommand<CreateStartArgs> = {
+    id: 'content.create.start',
     modes: ['dialog'],
-    match: (text) => parseCreate(text),
-    run: async ({ typeName, displayName, parentName }) => {
-        const resolution = await resolveParent(parentName);
-        if ('reply' in resolution) {
-            return resolution.reply;
-        }
-        const { parent } = resolution;
-
-        const types = await fetchCreatableTypes(parent);
-        const type = findContentType(types, typeName);
+    prompts: [null],
+    match: (text) => parseCreateStart(text),
+    run: async ({ typeName }) => {
+        const type = findContentType(await fetchCreatableTypes(), typeName);
         if (type == null) {
-            return { say: i18n('juke.reply.content.typeNotFound', typeName) };
+            return { say: i18n('juke.reply.create.typeNotFound', typeName) };
+        }
+        startCreateFlow(type);
+        return { say: i18n('juke.reply.create.askParent', type.getTitle()), prompt: 'createParent' };
+    },
+};
+
+export const createParentCommand: JukeCommand<CreateParentArgs> = {
+    id: 'content.create.parent',
+    modes: ['dialog'],
+    prompts: ['createParent'],
+    match: (text) => parseCreateParent(text),
+    run: async (args) => {
+        const flow = $createFlow.get();
+        if (args.kind === 'cancel' || flow == null) {
+            return cancelled();
+        }
+        const title = flow.type.getTitle();
+
+        let parent: ContentSummary | undefined;
+        if (args.kind === 'named') {
+            const result = await findContentByName(args.name, { accept: canHoldChildren });
+            if (result.kind === 'none') {
+                return { say: i18n('juke.reply.create.parentNotFound', args.name) };
+            }
+            if (result.kind === 'ambiguous') {
+                return { say: i18n('juke.reply.create.parentAmbiguous', args.name) };
+            }
+            parent = result.value;
         }
 
-        const name = displayName != null ? toDisplayName(displayName) : undefined;
+        if (!(await isTypeAllowedUnder(flow.type, parent))) {
+            return {
+                say:
+                    parent != null
+                        ? i18n('juke.reply.create.notAllowed', title, parent.getDisplayName())
+                        : i18n('juke.reply.create.notAllowedRoot', title),
+            };
+        }
+
+        setCreateFlowParent(parent);
+        return { say: i18n('juke.reply.create.askName', title), prompt: 'createName' };
+    },
+};
+
+export const createNameCommand: JukeCommand<CreateNameArgs> = {
+    id: 'content.create.name',
+    modes: ['dialog'],
+    prompts: ['createName'],
+    match: (text) => parseCreateName(text),
+    run: async (args) => {
+        const flow = $createFlow.get();
+        if (args.kind === 'cancel' || flow == null) {
+            return cancelled();
+        }
+        const title = flow.type.getTitle();
+        const displayName = toDisplayName(args.name);
+
         try {
-            const content = await createContent(type, parent, name);
+            const content = await createContent(flow, displayName);
             ContentUrlHelper.openEditContentTab(
                 ContentEditParams.create(content.getContentId()).setDisplayAsNew(true).build(),
             );
@@ -156,11 +181,20 @@ export const createContentCommand: JukeCommand<CreateArgs> = {
             await revealContentByPath(content.getPath().toString()).catch(() => undefined);
         } catch (error) {
             console.error('[juke] content creation failed', error);
-            return { say: i18n('juke.reply.content.failed', type.getTitle()) };
+            resetCreateFlow();
+            return { say: i18n('juke.reply.create.failed', title), prompt: null };
         }
 
-        return creatingReply(type, name, parentName != null ? parent : undefined);
+        const parentName = flow.parent?.getDisplayName();
+        resetCreateFlow();
+        return {
+            say:
+                parentName != null
+                    ? i18n('juke.reply.create.creating', title, displayName, parentName)
+                    : i18n('juke.reply.create.creatingRoot', title, displayName),
+            prompt: null,
+        };
     },
 };
 
-export const contentCommands: readonly JukeCommand[] = [createContentCommand];
+export const contentCommands: readonly JukeCommand[] = [createStartCommand, createParentCommand, createNameCommand];
