@@ -101,8 +101,8 @@ Within `dialog`, a `PendingPrompt` narrows what the next utterance means:
 
 | Pending prompt | Set by | Accepts |
 |---|---|---|
-| `createParent` | "Create a <type>" | root phrases, cancel, or a parent display name |
-| `createName` | parent accepted | cancel, or any phrase as the new display name |
+| `createParent` | "Create a <type>" | root phrases, cancel, "let's try again", or a parent display name |
+| `createName` | parent accepted | cancel, "let's try again", or any phrase as the new display name |
 | `search` | "New search" | filter phrases and keywords until a search is performed |
 | `showResults` | search finished with hits | "yes" (apply filter and open panel) or anything else (dismiss) |
 | `confirmDelete` | "Delete" | yes / no / cancel |
@@ -216,6 +216,7 @@ Phrases:
 - `juke.reply.create.creating=Creating a new {0} called {1} under {2}`
 - `juke.reply.create.creatingRoot=Creating a new {0} called {1} in the root`
 - `juke.reply.create.cancelled=Okay. Nothing was created.`
+- `juke.reply.create.restart=Okay. Let's start over. What do you want to create?`
 - `juke.reply.create.failed=I could not create a new {0}. Please try again.`
 
 Behaviour:
@@ -237,13 +238,14 @@ Behaviour:
      found: type-not-found reply, no prompt. Found: "Where do you want to create a new <Type>?" and prompt
      `createParent`.
   2. In `createParent`: "root", "in the root", "at the root", "project root" → root. "cancel"/"never mind"
-     → cancelled reply, dialog closed. Anything else (optionally prefixed "under|in|inside|below|into [the]")
+     → cancelled reply, dialog closed. "let's try again"/"try again"/"start over"/"restart" → collected
+     state dropped, restart reply, no prompt; the user then says "create a ..." again. Anything else (optionally prefixed "under|in|inside|below|into [the]")
      is a parent display name resolved with `findContentByName` + `canHoldChildren`. Not found or ambiguous:
      the matching reply, prompt stays. Then the allowed types for that parent are fetched
      (`ContentTypesHelper.getAvailableContentTypes` with the parent id, or none for root); if the type is not
      allowed there Juke says so and keeps asking. Otherwise "How do you want to call the new <Type>?" and prompt
      `createName`.
-  3. In `createName`: "cancel" → cancelled. Any other phrase is the name (first letter capitalized). Juke
+  3. In `createName`: "cancel" → cancelled; "let's try again" → restart as above. Any other phrase is the name (first letter capitalized). Juke
      creates through the legacy `CreateContentRequest` (unnamed path, display name set, workflow in progress),
      opens `/edit/<id>?displayAsNew` in a new tab, reveals the item in the browse tree with
      `revealContentByPath`, and confirms "Creating a new <Type> called <Name> under <Parent>" or "... in the

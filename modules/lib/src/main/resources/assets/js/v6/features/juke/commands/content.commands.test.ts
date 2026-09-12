@@ -153,6 +153,13 @@ describe('parseCreateParent', () => {
         expect(parseCreateParent('cancel')).toEqual({ kind: 'cancel' });
         expect(parseCreateParent('never mind')).toEqual({ kind: 'cancel' });
     });
+
+    it.each(['lets try again', 'let us try again', 'try again', 'start over', 'lets start over', 'restart'])(
+        'should recognize "%s" as a restart',
+        (text) => {
+            expect(parseCreateParent(text)).toEqual({ kind: 'restart' });
+        },
+    );
 });
 
 describe('findContentType', () => {
@@ -311,6 +318,29 @@ describe('create dialog', () => {
             prompt: null,
         });
         expect(mocks.makeNewContentRequest).not.toHaveBeenCalled();
+    });
+
+    it('should start over on "let\'s try again" at either step', async () => {
+        await runResolved('create a blog');
+        expect(await runResolved('lets try again', 'createParent')).toEqual({
+            say: 'juke.reply.create.restart',
+            prompt: null,
+        });
+        expect($createFlow.get()).toBeNull();
+
+        await runResolved('create a blog');
+        await runResolved('root', 'createParent');
+        expect(await runResolved('start over', 'createName')).toEqual({
+            say: 'juke.reply.create.restart',
+            prompt: null,
+        });
+        expect($createFlow.get()).toBeNull();
+        expect(mocks.makeNewContentRequest).not.toHaveBeenCalled();
+
+        expect(await runResolved('create an article')).toEqual({
+            say: 'juke.reply.create.askParent|Article',
+            prompt: 'createParent',
+        });
     });
 
     it('should let goodbye win over an open prompt', async () => {

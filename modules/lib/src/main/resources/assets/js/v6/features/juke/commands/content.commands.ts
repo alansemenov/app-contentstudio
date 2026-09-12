@@ -36,11 +36,16 @@ import { bestUniqueMatch } from './matching';
 //
 
 export type CreateStartArgs = { typeName: string };
-export type CreateParentArgs = { kind: 'root' } | { kind: 'cancel' } | { kind: 'named'; name: string };
-export type CreateNameArgs = { kind: 'cancel' } | { kind: 'named'; name: string };
+export type CreateParentArgs =
+    | { kind: 'root' }
+    | { kind: 'cancel' }
+    | { kind: 'restart' }
+    | { kind: 'named'; name: string };
+export type CreateNameArgs = { kind: 'cancel' } | { kind: 'restart' } | { kind: 'named'; name: string };
 
 const CREATE_PATTERN = /^(?:create|make|add|new)\s+(?:(?:a|an)\s+)?(?:new\s+)?(.+)$/;
 const CANCEL_PATTERN = /^(?:cancel|never mind|nevermind|stop|forget it|no)$/;
+const RESTART_PATTERN = /^(?:lets|let us)?\s*(?:try again|start over|start again|restart)$/;
 const ROOT_PATTERN = /^(?:(?:in|at|under|inside|to)\s+)?(?:the\s+)?(?:project\s+)?root(?:\s+(?:folder|level))?$/;
 const PARENT_PREFIX = /^(?:under|in|inside|below|into)\s+(?:the\s+)?/;
 
@@ -53,6 +58,9 @@ export function parseCreateParent(text: string): CreateParentArgs {
     if (CANCEL_PATTERN.test(text)) {
         return { kind: 'cancel' };
     }
+    if (RESTART_PATTERN.test(text)) {
+        return { kind: 'restart' };
+    }
     if (ROOT_PATTERN.test(text)) {
         return { kind: 'root' };
     }
@@ -60,7 +68,13 @@ export function parseCreateParent(text: string): CreateParentArgs {
 }
 
 export function parseCreateName(text: string): CreateNameArgs {
-    return CANCEL_PATTERN.test(text) ? { kind: 'cancel' } : { kind: 'named', name: text };
+    if (CANCEL_PATTERN.test(text)) {
+        return { kind: 'cancel' };
+    }
+    if (RESTART_PATTERN.test(text)) {
+        return { kind: 'restart' };
+    }
+    return { kind: 'named', name: text };
 }
 
 export function findContentType(types: readonly ContentTypeSummary[], spokenName: string): ContentTypeSummary | null {
@@ -106,6 +120,12 @@ const cancelled = (): JukeReply => {
     return { say: i18n('juke.reply.create.cancelled'), prompt: null };
 };
 
+// "Let's try again" drops everything collected so far and invites a fresh "create a ...".
+const restarted = (): JukeReply => {
+    resetCreateFlow();
+    return { say: i18n('juke.reply.create.restart'), prompt: null };
+};
+
 export const createStartCommand: JukeCommand<CreateStartArgs> = {
     id: 'content.create.start',
     modes: ['dialog'],
@@ -130,6 +150,9 @@ export const createParentCommand: JukeCommand<CreateParentArgs> = {
         const flow = $createFlow.get();
         if (args.kind === 'cancel' || flow == null) {
             return cancelled();
+        }
+        if (args.kind === 'restart') {
+            return restarted();
         }
         const title = flow.type.getTitle();
 
@@ -168,6 +191,9 @@ export const createNameCommand: JukeCommand<CreateNameArgs> = {
         const flow = $createFlow.get();
         if (args.kind === 'cancel' || flow == null) {
             return cancelled();
+        }
+        if (args.kind === 'restart') {
+            return restarted();
         }
         const title = flow.type.getTitle();
         const displayName = toDisplayName(args.name);
