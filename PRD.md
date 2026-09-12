@@ -246,7 +246,9 @@ Behaviour:
      allowed there Juke says so and keeps asking. Otherwise "How do you want to call the new <Type>?" and prompt
      `createName`.
   3. In `createName`: "cancel" → cancelled; "let's try again" → restart as above. Any other phrase is the name (first letter capitalized). Juke
-     creates through the legacy `CreateContentRequest` (unnamed path, display name set, workflow in progress),
+     creates through the legacy `CreateContentRequest` (display name set; path name generated from it with the
+     wizard's rules — `NamePrettyfier.prettify`, or simplified for media / when `allowPathTransliteration` is off —
+     and suffixed `-1`, `-2`, … via `contentExistsByPath` when the path is taken; workflow in progress),
      opens `/edit/<id>?displayAsNew` in a new tab, reveals the item in the browse tree with
      `revealContentByPath`, and confirms "Creating a new <Type> called <Name> under <Parent>" or "... in the
      root". Failure: failed reply, dialog closed.

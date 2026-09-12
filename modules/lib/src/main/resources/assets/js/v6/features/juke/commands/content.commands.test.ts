@@ -1,4 +1,6 @@
 import { okAsync, errAsync } from 'neverthrow';
+import { Name } from '@enonic/lib-admin-ui/Name';
+import { $config } from '../../../shared/config/config.store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContentTypeSummary } from '@enonic/lib-admin-ui/schema/content/ContentTypeSummary';
 import { $createFlow, resetCreateFlow } from '../model/createFlow.store';
@@ -10,6 +12,7 @@ import {
     createParentCommand,
     createStartCommand,
     findContentType,
+    generateContentName,
     parseCreateParent,
     parseCreateStart,
     toDisplayName,
@@ -24,7 +27,9 @@ const { mocks } = vi.hoisted(() => ({
         sendAndParse: vi.fn(),
         setParent: vi.fn(),
         setDisplayName: vi.fn(),
+        setName: vi.fn(),
         makeNewContentRequest: vi.fn(),
+        contentExistsByPath: vi.fn(),
         openEditContentTab: vi.fn(),
         revealContentByPath: vi.fn(),
         getActiveProject: vi.fn(),
@@ -34,6 +39,16 @@ const { mocks } = vi.hoisted(() => ({
 
 vi.mock('@enonic/lib-admin-ui/util/Messages', () => ({
     i18n: (key: string, ...args: unknown[]) => [key, ...args].join('|'),
+}));
+
+vi.mock('@enonic/lib-admin-ui/NamePrettyfier', () => ({
+    NamePrettyfier: {
+        prettify: (value: string) =>
+            value
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, ''),
+    },
 }));
 
 vi.mock('../../../entities/schema/api/contentTypes.api', () => ({
@@ -61,7 +76,18 @@ vi.mock('../../../../app/wizard/ContentEditParams', () => ({
 }));
 
 vi.mock('../../../../app/content/ContentPath', () => ({
-    ContentPath: { getRoot: () => 'ROOT' },
+    ContentPath: {
+        getRoot: () => 'ROOT',
+        create: () => ({ fromParent: (parent: string, child: string) => ({ build: () => `${parent}/${child}` }) }),
+    },
+}));
+
+vi.mock('../../../../app/content/ContentName', () => ({
+    ContentName: { fromString: (name: string) => `NAME:${name}` },
+}));
+
+vi.mock('../../../entities/content/api/contentExists.api', () => ({
+    contentExistsByPath: mocks.contentExistsByPath,
 }));
 
 vi.mock('../../../entities/content', () => ({
@@ -174,6 +200,25 @@ describe('findContentType', () => {
     });
 });
 
+describe('generateContentName', () => {
+    it('should prettify like the wizard name field when transliteration is on', () => {
+        $config.setKey('allowPathTransliteration', true);
+        expect(generateContentName('Summer News!', blog)).toBe('summer-news');
+    });
+
+    it('should only strip forbidden characters when transliteration is off or the type is media', () => {
+        const media = type('image', 'Image', { media: true });
+        $config.setKey('allowPathTransliteration', false);
+        expect(generateContentName('Summer News!', blog)).toBe(
+            'Summer News!'.replace(Name.SIMPLIFIED_FORBIDDEN_CHARS, '').toLowerCase(),
+        );
+        $config.setKey('allowPathTransliteration', true);
+        expect(generateContentName('Summer News!', media)).toBe(
+            'Summer News!'.replace(Name.SIMPLIFIED_FORBIDDEN_CHARS, '').toLowerCase(),
+        );
+    });
+});
+
 describe('toDisplayName', () => {
     it('should capitalize the first letter only', () => {
         expect(toDisplayName('summer news')).toBe('Summer news');
@@ -198,11 +243,15 @@ describe('create dialog', () => {
         const request = {
             setParent: mocks.setParent,
             setDisplayName: mocks.setDisplayName,
+            setName: mocks.setName,
             sendAndParse: mocks.sendAndParse,
         };
         mocks.setParent.mockReturnValue(request);
         mocks.setDisplayName.mockReturnValue(request);
+        mocks.setName.mockReturnValue(request);
         mocks.makeNewContentRequest.mockReturnValue(request);
+        mocks.contentExistsByPath.mockReturnValue(okAsync(false));
+        $config.setKey('allowPathTransliteration', true);
         mocks.findContentByName.mockResolvedValue({ kind: 'match', value: blogs });
         mocks.revealContentByPath.mockResolvedValue(undefined);
     });
@@ -278,6 +327,8 @@ describe('create dialog', () => {
         expect(mocks.makeNewContentRequest).toHaveBeenCalledWith(blog.getContentTypeName());
         expect(mocks.setParent).toHaveBeenCalledWith('BLOGS_PATH');
         expect(mocks.setDisplayName).toHaveBeenCalledWith('Summer news');
+        expect(mocks.contentExistsByPath).toHaveBeenCalledWith('BLOGS_PATH/summer-news');
+        expect(mocks.setName).toHaveBeenCalledWith('NAME:summer-news');
         expect(mocks.openEditContentTab).toHaveBeenCalledWith({ contentId: 'new-id', displayAsNew: true });
         expect(mocks.revealContentByPath).toHaveBeenCalledWith('/blogs/new');
         expect(reply).toEqual({ say: 'juke.reply.create.creating|Blog Post|Summer news|Blogs', prompt: null });
@@ -292,6 +343,21 @@ describe('create dialog', () => {
 
         expect(mocks.setParent).toHaveBeenCalledWith('ROOT');
         expect(reply).toEqual({ say: 'juke.reply.create.creatingRoot|Blog Post|Summer news', prompt: null });
+    });
+
+    it('should add a numeric suffix when the generated path is taken', async () => {
+        await runResolved('create a blog');
+        await runResolved('root', 'createParent');
+        mocks.contentExistsByPath.mockReturnValueOnce(okAsync(true)).mockReturnValueOnce(okAsync(true));
+
+        await runResolved('summer news', 'createName');
+
+        expect(mocks.contentExistsByPath.mock.calls.map((call) => call[0])).toEqual([
+            'ROOT/summer-news',
+            'ROOT/summer-news-1',
+            'ROOT/summer-news-2',
+        ]);
+        expect(mocks.setName).toHaveBeenCalledWith('NAME:summer-news-2');
     });
 
     it('should take any phrase as the name, including ones that look like commands', async () => {

@@ -1,6 +1,9 @@
+import { Name } from '@enonic/lib-admin-ui/Name';
+import { NamePrettyfier } from '@enonic/lib-admin-ui/NamePrettyfier';
 import type { ContentTypeSummary } from '@enonic/lib-admin-ui/schema/content/ContentTypeSummary';
 import { i18n } from '@enonic/lib-admin-ui/util/Messages';
 import type { Content } from '../../../../app/content/Content';
+import { ContentName } from '../../../../app/content/ContentName';
 import { ContentPath } from '../../../../app/content/ContentPath';
 import type { ContentSummary } from '../../../../app/content/ContentSummary';
 import { ContentHelper } from '../../../../app/util/ContentHelper';
@@ -8,6 +11,8 @@ import { ContentTypesHelper } from '../../../../app/util/ContentTypesHelper';
 import { ContentUrlHelper } from '../../../../app/util/ContentUrlHelper';
 import { ContentEditParams } from '../../../../app/wizard/ContentEditParams';
 import { revealContentByPath } from '../../../entities/content';
+import { contentExistsByPath } from '../../../entities/content/api/contentExists.api';
+import { $config } from '../../../shared/config/config.store';
 import { getActiveProject } from '../../../entities/project';
 import { fetchAllContentTypes } from '../../../entities/schema/api/contentTypes.api';
 import {
@@ -107,12 +112,42 @@ async function isTypeAllowedUnder(type: ContentTypeSummary, parent: ContentSumma
     return allowed.some((candidate) => candidate.getContentTypeName().toString() === wanted);
 }
 
+// Same rules as the wizard's name field: transliterated and prettified, or
+// simplified for media types and when transliteration is disabled.
+export function generateContentName(displayName: string, type: ContentTypeSummary): string {
+    const simplified = type.getContentTypeName().isDescendantOfMedia() || !$config.get().allowPathTransliteration;
+    return simplified
+        ? displayName.replace(Name.SIMPLIFIED_FORBIDDEN_CHARS, '').toLowerCase()
+        : NamePrettyfier.prettify(displayName);
+}
+
+const MAX_NAME_ATTEMPTS = 50;
+
+// The wizard flags an occupied path and lets the user fix it; by voice the name
+// gets a numeric suffix instead.
+async function resolveUniqueName(baseName: string, parentPath: ContentPath): Promise<string> {
+    for (let attempt = 0; attempt < MAX_NAME_ATTEMPTS; attempt++) {
+        const candidate = attempt === 0 ? baseName : `${baseName}-${attempt}`;
+        const path = ContentPath.create().fromParent(parentPath, candidate).build();
+        const exists = await contentExistsByPath(path.toString());
+        if (exists.isErr() || !exists.value) {
+            return candidate;
+        }
+    }
+    return `${baseName}-${Date.now()}`;
+}
+
 async function createContent(flow: CreateFlow, displayName: string): Promise<Content> {
     const parentPath = flow.parent != null ? flow.parent.getPath() : ContentPath.getRoot();
-    return ContentHelper.makeNewContentRequest(flow.type.getContentTypeName())
+    const request = ContentHelper.makeNewContentRequest(flow.type.getContentTypeName())
         .setParent(parentPath)
-        .setDisplayName(displayName)
-        .sendAndParse();
+        .setDisplayName(displayName);
+
+    const baseName = generateContentName(displayName, flow.type);
+    if (baseName.length > 0) {
+        request.setName(ContentName.fromString(await resolveUniqueName(baseName, parentPath)));
+    }
+    return request.sendAndParse();
 }
 
 const cancelled = (): JukeReply => {
