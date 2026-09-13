@@ -131,6 +131,10 @@ The search should produce exactly the same number of items as what Juke claimed 
 - Item already in the requested state: "<name> is already expanded" / "<name> is already collapsed"
 - Item not visible in the tree: "I can't see <name> in the tree."
 
+**APIs:** none. Expanding and collapsing is pure client-side tree state; Juke makes no REST calls for it.
+
+**Code to investigate:** `v6/entities/content/model/content-tree.store.ts`
+
 > Selecting items by voice was dropped from this milestone (2026-09-13). Its only purpose was to feed the
 > toolbar actions, which now name their target directly (see Milestone 4).
 

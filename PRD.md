@@ -306,7 +306,8 @@ Tree acceptance:
 - Not visible: not-visible reply. Ambiguous: ambiguous reply. Leaf without children: leaf reply.
 - Already in the requested state: "<name> is already expanded" / "... collapsed", no change.
 - Otherwise `expandNode` / `collapseNode` (or `expandFilterNode` in filter mode) and the expanding/collapsing
-  reply. Expanding a node whose children are not loaded yet triggers the normal lazy load.
+  reply. Pure client-side: Juke only changes the tree store's expanded state and issues no REST calls; if the
+  tree itself lazy-loads children on expand, that is the tree's own behaviour, not Juke's.
 
 ### Milestone 4 — Toolbar actions on a spoken target
 
