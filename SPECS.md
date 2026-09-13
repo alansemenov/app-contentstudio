@@ -1,186 +1,195 @@
-Specifications for Voice support in Content Studio branded as Juke
+# Voice Support in Content Studio (branded as Juke)
 
+## Goal
 
-Goal
-Voice assistant in Content Studio which understands and responds to specific voice commands in the browser by executing editorial actions already supported by the Content Studio.
+A voice assistant in Content Studio which understands and responds to specific voice commands in the browser
+by executing editorial actions already supported by Content Studio.
 
-Requirements:
-Juke Operator (app-ai-content-operator) must be installed but voice analyser and mcp server should be located inside the Content Studio itself. This way we won’t have to solve communication between the Juke app and Content Studio. The Juke app will be used in later milestones for generation of sample input values in content edit mode.
-No voice processing should happen if the Juke Operator is not installed.
-Microphone should be enabled in the browser.
+## Requirements
 
-Milestone 1
+- Juke Operator (`app-ai-content-operator`) must be installed, but the voice analyser and the command module
+  should be located inside Content Studio itself. This way we won't have to solve communication between the
+  Juke app and Content Studio. The Juke app will be used in later milestones for generation of sample input
+  values in content edit mode.
+- No voice processing should happen if the Juke Operator is not installed.
+- Microphone should be enabled in the browser.
+
+## Milestone 1 — Voice mode
+
 Juke goes in and out of voice mode by reacting to fixed commands.
-Juke goes to “dialog mode” after a specific command: “Hello, Juke”. This is visualised by the Juke icon appearing in the bottom right corner of Content Studio.
-The Juke icon should animate when accepting voice commands and when answering, two different types of animation.
-Juke closes the “dialog mode” after a specific command: “Goodbye, Juke”. The Juke icon then disappears.
 
-Use case 1:
-User: “Hello, Juke”
-Juke: “Hello, <username>. What can I help you with today?”
+- Juke enters "dialog mode" after a specific command: **"Hello, Juke"**. This is visualised by the Juke icon
+  appearing in the bottom right corner of Content Studio.
+- The Juke icon should animate when accepting voice commands and when answering, with two different types of
+  animation.
+- Juke closes the "dialog mode" after a specific command: **"Goodbye, Juke"**. The Juke icon then disappears.
 
-Use case 2:
-User: “Goodbye, Juke”.
-Juke: “Goodbye, <username>. See you next time.”
+### Use cases
 
-Use case 3:
-User: random command that Juke doesn’t understand
-Juke: I’m not sure how to respond to this command. Please try again.
+| # | User says | Juke answers |
+|---|---|---|
+| 1 | "Hello, Juke" | "Hello, <username>. What can I help you with today?" |
+| 2 | "Goodbye, Juke" | "Goodbye, <username>. See you next time." |
+| 3 | A random command Juke doesn't understand | "I'm not sure how to respond to this command. Please try again." |
 
-Milestone 2
+## Milestone 2 — Admin API actions
 
-Juke understands the Admin API in Content Studio and can perform specific editorial actions by reacting to voice commands:
+Juke understands the Admin API in Content Studio and can perform specific editorial actions by reacting to
+voice commands.
 
-Goal 1. Switching between projects
+### Goal 1: Switching between projects
 
-Command:
-Go to “<project name>”
+**Command:** "Go to <project name>"
 
-Sample answers:
-If the project is not found: “I cannot find project <project name> in the system. Please try a different project.”
-If the project is found: “Switching to “<project name>””
+**Sample answers:**
 
-Expected action:
-Juke switches to the required project, without opening the project selection dialog.
+- Project not found: "I cannot find project <project name> in the system. Please try a different project."
+- Project found: "Switching to <project name>"
 
-APIs:
-Fetch the list of projects: project/list
+**Expected action:** Juke switches to the required project, without opening the project selection dialog.
 
-Code to investigate: ProjectSelectionDialog.tsx
+**APIs:**
 
-Goal 2. Create a new content
+- Fetch the list of projects: `project/list`
 
-Command:
-“Create a new <content type>”, for example “Create a new blog”.
+**Code to investigate:** `ProjectSelectionDialog.tsx`
 
-Sample answers:
-If the content type is found: “Creating a new <content type>” (if <content type> exists in the system - listed in the “New Content” dialog)
-If the content type is not found: “I cannot find <content type> in the system”. Make sure it exists.
+### Goal 2: Create a new content
 
-Expected action:
-Juke creates a new content of the required type and opens a new browser tab for editing the new content.
+**Command:** "Create a new <content type>", for example "Create a new blog".
 
-APIs:
-Fetch the list of content types: schema/filter/contentTypes
-Create a new content: content/create
+**Sample answers:**
 
-Code to investigate: ContentEventsProcessor.handleNew()
+- Content type found (listed in the "New Content" dialog): "Creating a new <content type>"
+- Content type not found: "I cannot find <content type> in the system. Make sure it exists."
 
-Milestone 3
+**Expected action:** Juke creates a new content of the required type and opens a new browser tab for editing
+the new content.
 
-Goal 1.	Perform search by applying the filter. This assumes that Juke studies current aggregations in the filter panel before producing a response. User can combine several filter parameters in the same command
+**APIs:**
 
-Search mode will be triggered with the command “New Search”.
-Juke should in this case reset the filter (if it’s applied) and answer “What are you looking for?”
+- Fetch the list of content types: `schema/filter/contentTypes`
+- Create a new content: `content/create`
 
-Sample commands when the search mode is on:
-“Content type <content type>” - select the requested type under “Content Type” parameter of the filter panel
-“Last modified by me” or “Last modified by <user name>” - select user name under “Last modified by” parameter of the filter panel
-“Last modified today” - select “< 1 day” under “Last modified” parameter of the filter panel
-“Last modified this week” - select “< 1 week” under “Last modified” parameter of the filter panel
-“In progress” - select “in progress” under “Workflow”
-Any command that doesn’t start with “content type”, “last modified by”, “last modified today”, “last modified this week” or “in progress” should be considered keywords for the free text search.
+**Code to investigate:** `ContentEventsProcessor.handleNew()`
 
-Performing a search should automatically close the search mode so that the user can start working with the found content. To perform a new search the user should say “New Search” again.
+## Milestone 3 — Search and selection
 
-Sample answer:
-I couldn’t find any content items matching your criteria. Try a different search”
-“I found <X> content items matching your criteria. Do you want to see them?”
+### Goal 1: Perform search by applying the filter
 
-If user answers “yes” to the “Do you want to see them” question, Juke should:
-Open the filter panel
-Fill in the filter parameters required by the user
-Apply the filter
-The search should produce exactly the same number of items as what Juke claimed he found.
+This assumes that Juke studies current aggregations in the filter panel before producing a response. The user
+can combine several filter parameters in the same command.
 
-Goal 2. Select or unselect content items currently displayed in the content list. This can be unfiltered or filtered list.
+Search mode is triggered with the command **"New Search"**. Juke should then reset the filter (if applied) and
+answer "What are you looking for?"
 
-Sample commands:
-“Select the top one”
-“Select the first one”
-“Select the bottom one”
-“Select the last one”
-“Select the third one”
-“Select the third one from the bottom”
-“Select all”
-“Select <part of the display name>”
-“Unselect”
+**Sample commands when search mode is on:**
 
-Sample answer:
-1 item selected. What do you want me to do with it?
-<X> items selected. What do you want me to do with them?
-All items are unselected.
+| Command | Filter panel action |
+|---|---|
+| "Content type <content type>" | Select the requested type under "Content Type" |
+| "Last modified by me" or "Last modified by <user name>" | Select the user under "Last modified by" |
+| "Last modified today" | Select "< 1 day" under "Last modified" |
+| "Last modified this week" | Select "< 1 week" under "Last modified" |
+| "In progress" | Select "in progress" under "Workflow" |
 
-APIs:
-Get aggregations for the search: content/query, with aggregationQueries field provided
-Perform search: content/query, with query field provided
+Any command that doesn't start with "content type", "last modified by", "last modified today", "last modified
+this week" or "in progress" should be considered keywords for the free text search.
 
-Code to investigate: /v6/features/search
+Performing a search should automatically close the search mode so that the user can start working with the
+found content. To perform a new search the user should say "New Search" again.
 
-Milestone 4
+**Sample answers:**
 
-Goal: Apply actions from the toolbar to items selected in the list.
+- "I couldn't find any content items matching your criteria. Try a different search."
+- "I found <X> content items matching your criteria. Do you want to see them?"
 
-Supported commands are:
-Edit
-Delete
-Move
-Duplicate
-Preview
+If the user answers "yes" to the "Do you want to see them?" question, Juke should:
 
-Edit
-Will open selected item(s) for edit - one browser tab for each
+1. Open the filter panel.
+2. Fill in the filter parameters required by the user.
+3. Apply the filter.
 
-Code to investigate: ContentEventsProcessor.handleEdit()
+The search should produce exactly the same number of items as what Juke claimed it found.
 
-Delete
-Juke should ask: “Are you sure you want to delete <display name>” (if 1 item is selected) or “Are you sure you want to delete <X> items” (if more than one selected)
+### Goal 2: Select or unselect content items in the content list
 
-If the user responds with “No” or “Cancel”, Juke won’t do anything.
-If the user responds with “Yes”, Juke should delete the selected items and respond with “Selected content is deleted”.
+Applies to the list currently displayed, unfiltered or filtered.
 
+**Sample commands:**
 
-Code to investigate: v6/features/delete
+- "Select the top one"
+- "Select the first one"
+- "Select the bottom one"
+- "Select the last one"
+- "Select the third one"
+- "Select the third one from the bottom"
+- "Select all"
+- "Select <part of the display name>"
+- "Unselect"
 
+**Sample answers:**
 
-Move
+- "1 item selected. What do you want me to do with it?"
+- "<X> items selected. What do you want me to do with them?"
+- "All items are unselected."
 
-Juke should ask: “Where do you want to move the selected content?”
+**APIs:**
 
-Case 1:
-User responds with part of or entire display name of the content which will be the new parent.
-Juke should then perform free-text search based on the provided keyword to find the new parent in the current project.
-If and only if one item is found, Juke should then move the selected item(s) under the new parent and respond with “Selected content is moved”.
+- Get aggregations for the search: `content/query`, with the `aggregationQueries` field provided
+- Perform search: `content/query`, with the `query` field provided
 
-Case 2:
-User responds with “Cancel”. Juke doesn’t do anything.
+**Code to investigate:** `/v6/features/search`
 
-Code to investigate: /v6/features/move
+## Milestone 4 — Toolbar actions
 
+**Goal:** Apply actions from the toolbar to the items selected in the list.
 
-Duplicate
+Supported commands: **Edit**, **Delete**, **Move**, **Duplicate**, **Preview**.
 
-Juke should ask: “Do you want to include child items of the selected content when creating duplicates”
+### Edit
 
-Case 1:
-User responds with “Yes”.
-Juke creates duplicates of all the selected items, including their children, then responds with “Selected content is duplicated with all the children”
+Opens the selected item(s) for editing, one browser tab for each.
 
-Case 2:
-User responds with “No”.
-Juke creates duplicates of all the selected items, excluding their children, then responds with “Selected content is duplicated without the children”
+**Code to investigate:** `ContentEventsProcessor.handleEdit()`
 
-Case 3:
-User responds with “Cancel”.
-Juke doesn’t do anything.
+### Delete
 
-Code to investigate: /v6/features/duplicate
+Juke asks "Are you sure you want to delete <display name>?" if one item is selected, or "Are you sure you
+want to delete <X> items?" if more than one is selected.
 
+- User responds "No" or "Cancel": Juke does nothing.
+- User responds "Yes": Juke deletes the selected items and responds "Selected content is deleted."
 
+**Code to investigate:** `v6/features/delete`
 
-Preview
+### Move
 
-Juke opens a browser tab with a preview of each of the selected item, if this item can be previewed. If not, bypass that item.
+Juke asks "Where do you want to move the selected content?"
 
-Code to investigate: PreviewActionHelper.ts
+- **Case 1:** The user responds with part of or the entire display name of the content that will be the new
+  parent. Juke performs a free-text search based on the provided keyword to find the new parent in the current
+  project. If and only if one item is found, Juke moves the selected item(s) under the new parent and responds
+  "Selected content is moved."
+- **Case 2:** The user responds "Cancel". Juke does nothing.
 
+**Code to investigate:** `/v6/features/move`
+
+### Duplicate
+
+Juke asks "Do you want to include child items of the selected content when creating duplicates?"
+
+- **Case 1:** The user responds "Yes". Juke duplicates all the selected items including their children, then
+  responds "Selected content is duplicated with all the children."
+- **Case 2:** The user responds "No". Juke duplicates all the selected items excluding their children, then
+  responds "Selected content is duplicated without the children."
+- **Case 3:** The user responds "Cancel". Juke does nothing.
+
+**Code to investigate:** `/v6/features/duplicate`
+
+### Preview
+
+Juke opens a browser tab with a preview of each selected item that can be previewed. Items that cannot be
+previewed are skipped.
+
+**Code to investigate:** `PreviewActionHelper.ts`
