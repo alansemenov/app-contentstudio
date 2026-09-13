@@ -73,7 +73,7 @@ the new content.
 
 **Code to investigate:** `ContentEventsProcessor.handleNew()`
 
-## Milestone 3 — Search and selection
+## Milestone 3 — Search and tree navigation
 
 ### Goal 1: Perform search by applying the filter
 
@@ -112,28 +112,6 @@ If the user answers "yes" to the "Do you want to see them?" question, Juke shoul
 
 The search should produce exactly the same number of items as what Juke claimed it found.
 
-### Goal 2: Select or unselect content items in the content list
-
-Applies to the list currently displayed, unfiltered or filtered.
-
-**Sample commands:**
-
-- "Select the top one"
-- "Select the first one"
-- "Select the bottom one"
-- "Select the last one"
-- "Select the third one"
-- "Select the third one from the bottom"
-- "Select all"
-- "Select <part of the display name>"
-- "Unselect"
-
-**Sample answers:**
-
-- "1 item selected. What do you want me to do with it?"
-- "<X> items selected. What do you want me to do with them?"
-- "All items are unselected."
-
 **APIs:**
 
 - Get aggregations for the search: `content/query`, with the `aggregationQueries` field provided
@@ -141,55 +119,84 @@ Applies to the list currently displayed, unfiltered or filtered.
 
 **Code to investigate:** `/v6/features/search`
 
-## Milestone 4 — Toolbar actions
+### Goal 2: Expand and collapse items in the tree
 
-**Goal:** Apply actions from the toolbar to the items selected in the list.
+**Commands:** "Expand <content name>", "Collapse <content name>"
 
-Supported commands: **Edit**, **Delete**, **Move**, **Duplicate**, **Preview**.
+**Requirement:** The item must already be loaded and visible in the tree structure.
+
+**Sample answers:**
+
+- Item found and state changes: "Expanding <name>" / "Collapsing <name>"
+- Item already in the requested state: "<name> is already expanded" / "<name> is already collapsed"
+- Item not visible in the tree: "I can't see <name> in the tree."
+
+> Selecting items by voice was dropped from this milestone (2026-09-13). Its only purpose was to feed the
+> toolbar actions, which now name their target directly (see Milestone 4).
+
+## Milestone 4 — Toolbar actions on a spoken target
+
+**Goal:** Apply actions from the toolbar to the item the user names in the command.
+
+Supported actions: **Edit**, **Delete**, **Move**, **Duplicate**, **Preview**.
+
+**Command form:** "<action> <target>", for example "Duplicate the top one", "Move the bottom one",
+"Edit <content name>".
+
+**Targets:**
+
+| Target | Examples | Meaning |
+|---|---|---|
+| Position | "the top one", "the first one", "the third one", "the last one", "the bottom one", "the third one from the bottom" | The nth item of the list currently displayed (unfiltered or filtered) |
+| Name | "<part of the display name>" | The item with that display name, first among the visible items, otherwise anywhere in the project |
+| Implicit | "it", "them", "the selected", or the bare action | The items currently selected with the mouse |
+| All | "all" | All items currently displayed (preview and edit; delete and duplicate ask for confirmation with the count) |
+
+One target per command.
 
 ### Edit
 
-Opens the selected item(s) for editing, one browser tab for each.
+Opens the target item(s) for editing, one browser tab for each.
 
 **Code to investigate:** `ContentEventsProcessor.handleEdit()`
 
 ### Delete
 
-Juke asks "Are you sure you want to delete <display name>?" if one item is selected, or "Are you sure you
-want to delete <X> items?" if more than one is selected.
+Juke asks "Are you sure you want to delete <display name>?" for one item, or "Are you sure you want to delete
+<X> items?" for several.
 
 - User responds "No" or "Cancel": Juke does nothing.
-- User responds "Yes": Juke deletes the selected items and responds "Selected content is deleted."
+- User responds "Yes": Juke deletes the item(s) and responds "Selected content is deleted."
 
 **Code to investigate:** `v6/features/delete`
 
 ### Move
 
-Juke asks "Where do you want to move the selected content?"
+Juke asks "Where do you want to move <display name>?"
 
 - **Case 1:** The user responds with part of or the entire display name of the content that will be the new
   parent. Juke performs a free-text search based on the provided keyword to find the new parent in the current
-  project. If and only if one item is found, Juke moves the selected item(s) under the new parent and responds
-  "Selected content is moved."
+  project. If and only if one item is found, Juke moves the target item(s) under the new parent and responds
+  "<display name> is moved under <parent name>."
 - **Case 2:** The user responds "Cancel". Juke does nothing.
 
 **Code to investigate:** `/v6/features/move`
 
 ### Duplicate
 
-Juke asks "Do you want to include child items of the selected content when creating duplicates?"
+Juke asks "Do you want to include child items of <display name> when creating the duplicate?"
 
-- **Case 1:** The user responds "Yes". Juke duplicates all the selected items including their children, then
-  responds "Selected content is duplicated with all the children."
-- **Case 2:** The user responds "No". Juke duplicates all the selected items excluding their children, then
-  responds "Selected content is duplicated without the children."
+- **Case 1:** The user responds "Yes". Juke duplicates the item(s) including their children, then responds
+  "<display name> is duplicated with all the children."
+- **Case 2:** The user responds "No". Juke duplicates the item(s) excluding their children, then responds
+  "<display name> is duplicated without the children."
 - **Case 3:** The user responds "Cancel". Juke does nothing.
 
 **Code to investigate:** `/v6/features/duplicate`
 
 ### Preview
 
-Juke opens a browser tab with a preview of each selected item that can be previewed. Items that cannot be
+Juke opens a browser tab with a preview of each target item that can be previewed. Items that cannot be
 previewed are skipped.
 
 **Code to investigate:** `PreviewActionHelper.ts`

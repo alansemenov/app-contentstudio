@@ -79,8 +79,11 @@ v6/features/juke/
     project.commands.ts        (M2) "go to <project>"
     content.commands.ts        (M2) "create a new <content type>"
     search.commands.ts         (M3) "new search", filter phrases, keywords, "yes" to show results
-    select.commands.ts         (M3) select/unselect by position, name, all
-    toolbar.commands.ts        (M4) edit, delete, move, duplicate, preview with confirmation prompts
+    tree.commands.ts           (M3) expand / collapse a visible tree item by name
+    target.ts                  (M4) resolves a spoken target: position in the visible list, name, implicit
+                               selection, or "all"
+    toolbar.commands.ts        (M4) edit, delete, move, duplicate, preview on a spoken target, with
+                               confirmation prompts
   ui/
     JukeWidget.tsx             fixed bottom-right icon; visible only in 'dialog' mode; "breathe" while listening,
                                equalizer "bars" pill while speaking; keyframes/utilities live in assets/styles/tailwind.css
@@ -105,9 +108,9 @@ Within `dialog`, a `PendingPrompt` narrows what the next utterance means:
 | `createName` | parent accepted | cancel, "let's try again", or any phrase as the new display name |
 | `search` | "New search" | filter phrases and keywords until a search is performed |
 | `showResults` | search finished with hits | "yes" (apply filter and open panel) or anything else (dismiss) |
-| `confirmDelete` | "Delete" | yes / no / cancel |
-| `moveTarget` | "Move" | cancel or a display-name keyword |
-| `duplicateChildren` | "Duplicate" | yes / no / cancel |
+| `confirmDelete` | "Delete <target>" | yes / no / cancel |
+| `moveTarget` | "Move <target>" | cancel or a display-name keyword for the new parent |
+| `duplicateChildren` | "Duplicate <target>" | yes / no / cancel |
 
 Session commands ("goodbye juke", "hello juke") always win over pending prompts. Commands that only make sense
 without a pending prompt declare `prompts: [null]`; prompt commands declare their prompt and typically accept any
@@ -135,7 +138,8 @@ phrase, so nothing falls through to the unknown reply while a question is open.
 | Filter panel | `setContentFilterOpen`, `setContentFilterValue`, `setContentFilterSelection`, `resetContentFilter` in `features/search/model/contentFilter.store.ts`; aggregation names in `app/browse/filter/ContentAggregation.ts` (`contentTypes`, `workflow`, `lastModified`, `modifier`) |
 | Count hits without applying | `queryContent` in `entities/content/api/contentQuery.api.ts` with the same query the filter panel would build (`ContentBrowseFilterPanel.doSearch`) |
 | Displayed list order | `$activeFlatNodes` in `entities/content/model/active-tree.store.ts` (`node.id`, `node.data.displayName`) |
-| Selection | `setSelection(ids)`, `clearSelection()`, `selectAll()`, `getCurrentItems()`, `$selectionCount` in `entities/content/model/content-selection.store.ts` |
+| Implicit target | `getCurrentItems()` in `entities/content/model/content-selection.store.ts` (selected items, else the highlighted row) |
+| Tree expand/collapse | `expandNode`, `collapseNode`, `isNodeExpanded`, `getTreeNode`, `hasTreeNode` in `entities/content/model/content-tree.store.ts`; `expandFilterNode` in `filter-tree.store.ts` |
 | Delete | `openDeleteDialog(items)` then `executeDeleteDialogAction()` after `$isDeleteDialogReady`, or `archiveContent`/`deleteContent` in `features/delete/api/delete.api.ts` |
 | Move | `moveContent(contentIds, parentPath)` in `features/move/api/move.api.ts`; parent lookup via `queryContent` free-text search |
 | Duplicate | `duplicateContent(params)` in `features/duplicate/api/duplicate.api.ts` with `includeChildren` |
@@ -263,20 +267,27 @@ switch and not-found, and the create dialog end to end through the registry: typ
 root parent, unknown/ambiguous/disallowed parent, naming and creation, cancel at each step, goodbye during a
 prompt, creation failure.
 
-### Milestone 3 — Search and selection
+### Milestone 3 — Search and tree navigation
+
+Selection as a separate step is dropped (decided 2026-09-13): its only purpose was to feed Milestone 4, whose
+commands now name their target directly.
 
 Phrases:
 - `juke.reply.search.start=What are you looking for?`
 - `juke.reply.search.none=I couldn't find any content items matching your criteria. Try a different search.`
 - `juke.reply.search.found=I found {0} content items matching your criteria. Do you want to see them?`
-- `juke.reply.select.one=1 item selected. What do you want me to do with it?`
-- `juke.reply.select.many={0} items selected. What do you want me to do with them?`
-- `juke.reply.select.none=All items are unselected.`
+- `juke.reply.tree.expanding=Expanding {0}`
+- `juke.reply.tree.collapsing=Collapsing {0}`
+- `juke.reply.tree.alreadyExpanded={0} is already expanded`
+- `juke.reply.tree.alreadyCollapsed={0} is already collapsed`
+- `juke.reply.tree.notVisible=I can't see {0} in the tree. Expand its parent first.`
+- `juke.reply.tree.ambiguous=I can see several items named {0}. Be more specific.`
+- `juke.reply.tree.leaf={0} has no child items.`
 
 Search acceptance:
-- "New search" resets the filter (if applied), enters `search` prompt and speaks the start reply.
-- In `search` prompt, each utterance is parsed left to right into criteria; several may appear in one
-  utterance: `content type <x>`, `last modified by me|<user>`, `last modified today`, `last modified this week`,
+- "New search" resets the filter (if applied), enters the `search` prompt and speaks the start reply.
+- In `search`, each utterance is parsed left to right into criteria; several may appear in one utterance:
+  `content type <x>`, `last modified by me|<user>`, `last modified today`, `last modified this week`,
   `in progress`. Anything else becomes free-text keywords.
 - After each utterance Juke runs `content/query` with the same query the filter panel would produce (keywords,
   content type bucket, modifier bucket, lastModified range, workflow bucket) and answers with none/found.
@@ -286,40 +297,71 @@ Search acceptance:
 - Aggregation bucket keys are resolved from a `content/query` with `aggregationQueries` so that content type,
   modifier and workflow buckets use the exact keys the panel expects (content type name, principal key,
   workflow state).
+- Once the filtered list is on screen, Milestone 4 targets ("the top one", "<name>") work on it.
 
-Selection acceptance:
-- Positional commands operate on `$activeFlatNodes` order: first/top, last/bottom, ordinal (`second`, `third`,
-  ... `tenth`, and digits), `<ordinal> from the bottom`.
-- "Select all" calls `selectAll()`; "Unselect" calls `clearSelection()`.
-- "Select <name>" uses best unique match against `displayName` of loaded nodes; ambiguous or no match answers
-  with the unknown reply.
-- Replies use the resulting `$selectionCount`.
+Tree acceptance:
+- "Expand <name>" / "collapse <name>" (also "open up", "fold", "unfold") apply to an item that is already
+  loaded and visible in the tree — main tree or filtered tree, whichever is active (`$activeFlatNodes`). The
+  name is matched with `bestUniqueMatch` over the visible nodes' display names; nothing else is fetched.
+- Not visible: not-visible reply. Ambiguous: ambiguous reply. Leaf without children: leaf reply.
+- Already in the requested state: "<name> is already expanded" / "... collapsed", no change.
+- Otherwise `expandNode` / `collapseNode` (or `expandFilterNode` in filter mode) and the expanding/collapsing
+  reply. Expanding a node whose children are not loaded yet triggers the normal lazy load.
 
-### Milestone 4 — Toolbar actions on the selection
+### Milestone 4 — Toolbar actions on a spoken target
+
+Commands name their target instead of relying on a prior selection (decided 2026-09-13).
+
+Grammar: `<action> [the] <target>` where action is `edit`, `delete`, `move`, `duplicate`, `preview` and target
+is one of:
+
+| Target form | Examples | Resolves to |
+|---|---|---|
+| Position | "the top one", "the first one", "the third one", "the last one", "the bottom one", "the second one from the bottom", "number three" | The nth row of the list as displayed (`$activeFlatNodes`: expanded main tree, or the filtered list when a filter is active). Ordinals up to tenth and digits. |
+| Name | "edit summer news", "delete the superhero site" | First a unique `bestUniqueMatch` over the visible rows' display names; if nothing is visible by that name, `findContentByName` project-wide. Ambiguity is reported. |
+| Implicit | "delete it", "preview them", "edit the selected", bare "edit" | The current selection, else the highlighted row (`getCurrentItems()`). None → no-target reply. |
+| All | "preview all", "edit all" | Every visible row. Allowed for preview and edit; delete and duplicate go through their confirmation with the count. Move all is not supported. |
+
+Single target per command; multi-target lists ("the first three", "news and sport") are out of scope.
 
 Phrases:
+- `juke.reply.target.noSelection=Nothing is selected. Tell me which item, for example "the top one".`
+- `juke.reply.target.notFound=I can't find {0} in the list.`
+- `juke.reply.target.ambiguous=I found several items named {0}. Be more specific.`
+- `juke.reply.target.outOfRange=There are only {0} items in the list.`
+- `juke.reply.edit.opening=Opening {0} for editing.` / `juke.reply.edit.openingMany=Opening {0} items for editing.`
 - `juke.reply.delete.confirmOne=Are you sure you want to delete {0}?`
 - `juke.reply.delete.confirmMany=Are you sure you want to delete {0} items?`
 - `juke.reply.delete.done=Selected content is deleted.`
-- `juke.reply.move.where=Where do you want to move the selected content?`
-- `juke.reply.move.done=Selected content is moved.`
-- `juke.reply.duplicate.children=Do you want to include child items of the selected content when creating duplicates?`
-- `juke.reply.duplicate.doneWith=Selected content is duplicated with all the children.`
-- `juke.reply.duplicate.doneWithout=Selected content is duplicated without the children.`
-- `juke.reply.noSelection=No content is selected.` (defensive, not in spec)
+- `juke.reply.delete.cancelled=Okay. Nothing was deleted.`
+- `juke.reply.move.where=Where do you want to move {0}?`
+- `juke.reply.move.done={0} is moved under {1}.`
+- `juke.reply.move.targetNotFound=I can't find {0} in the current project. Try again.`
+- `juke.reply.move.targetAmbiguous=I found several items named {0}. Try again with a more specific name.`
+- `juke.reply.move.cancelled=Okay. Nothing was moved.`
+- `juke.reply.duplicate.children=Do you want to include child items of {0} when creating the duplicate?`
+- `juke.reply.duplicate.doneWith={0} is duplicated with all the children.`
+- `juke.reply.duplicate.doneWithout={0} is duplicated without the children.`
+- `juke.reply.duplicate.cancelled=Okay. Nothing was duplicated.`
+- `juke.reply.preview.opening=Opening a preview of {0}.` / `juke.reply.preview.none={0} cannot be previewed.`
+- `{0}` is the item's display name, or "<X> items" for several.
 
 Acceptance:
-- All five commands require a non-empty selection; otherwise the no-selection reply.
-- Edit: one edit tab per selected item.
-- Delete: confirmation prompt with display name or count; "yes" executes delete/archive through the delete
-  feature API and speaks done; "no"/"cancel" does nothing.
-- Move: asks where; a keyword answer uses `findContentByName` (M2) in the current project; a unique match
-  moves the selection under it and speaks done; zero or several hits answer with the unknown reply; "cancel"
-  does nothing. Selected items themselves are excluded from parent candidates.
-- Duplicate: asks about children; yes/no duplicates with or without children and speaks the matching reply;
-  "cancel" does nothing.
-- Preview: opens one tab per previewable item via `PreviewActionHelper.openWindows`, skipping non-previewable
-  items silently.
+- Target resolution (`commands/target.ts`) is shared by all five actions and unit-tested on its own.
+- Edit: one edit tab per resolved item via `ContentUrlHelper.openEditContentTab`; reply names the item or the
+  count.
+- Delete: confirmation prompt with display name or count → `confirmDelete`. "Yes" deletes through the delete
+  feature API (archive) and speaks done; "no"/"cancel" speaks cancelled and does nothing. The prompt holds the
+  resolved items, not the selection.
+- Move: "Where do you want to move <name>?" → `moveTarget`. The answer is a new-parent name resolved with
+  `findContentByName` + `canHoldChildren`, excluding the moved items and their descendants; a unique match moves
+  the items with `moveContent` and speaks done; not found / ambiguous keep the prompt; "cancel" cancels.
+- Duplicate: children question → `duplicateChildren`. "Yes"/"no" duplicates with or without children via
+  `duplicateContent` and speaks the matching reply; "cancel" cancels.
+- Preview: one tab per previewable resolved item via `PreviewActionHelper.openWindows`, skipping items that
+  cannot be previewed; if none can, the none reply.
+- "Cancel" and "let's try again" work in every prompt as in the create dialog.
+- Toolbar actions do not change the selection; the mouse selection stays whatever it was.
 
 ## 6. Non-goals (milestones 1–4)
 
@@ -351,10 +393,11 @@ Branch: `juke-voice`. Verify each step with `pnpm -C ./modules/lib run check` an
    - Phrases for M1; unit tests.
 2. **Milestone 2** (commit "Add Juke commands for project switching and content creation")
    - `matching.ts`; project command; v6 `createContent` API wrapper; content-type command; phrases; tests.
-3. **Milestone 3** (commit "Add Juke search and selection commands")
+3. **Milestone 3** (commit "Add Juke search and tree navigation commands")
    - Search prompt parser, query builder shared with filter panel, aggregation key resolution, show-results
-     flow; selection commands over `$activeFlatNodes`; phrases; tests.
+     flow; expand/collapse commands over `$activeFlatNodes`; phrases; tests.
 4. **Milestone 4** (commit "Add Juke toolbar commands: edit, delete, move, duplicate, preview")
-   - Confirmation prompts, five toolbar commands via feature APIs, preview via `PreviewActionHelper`; phrases;
+   - Target resolver (position, name, implicit, all); confirmation prompts; five toolbar commands via feature
+     APIs, preview via `PreviewActionHelper`; phrases;
      tests.
 5. After each milestone: manual verification checklist in Chrome on the `juke` sandbox, then pause for review.
