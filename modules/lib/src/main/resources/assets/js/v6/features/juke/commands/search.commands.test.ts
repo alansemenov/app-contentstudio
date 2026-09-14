@@ -239,6 +239,10 @@ describe('search dialog', () => {
         'reset the search',
         'new surge',
         'search',
+        'you search',
+        'use search',
+        'and you search',
+        'usage',
     ])('should start on "%s"', (text) => {
         expect(resolveCommand([text], context())?.command.id).toBe('search.start');
     });
