@@ -148,7 +148,7 @@ phrase, so nothing falls through to the unknown reply while a question is open.
 | Delete | `archiveContent` in `entities/content/api/delete.api.ts` (moved from `features/delete/api`, shim left) |
 | Move | `moveContent(contentIds, parentPath?)` in `entities/content/api/move.api.ts` (moved from `features/move/api`, shim left); parent lookup via `findContentByName` |
 | Duplicate | `duplicateContent(params)` in `entities/content/api/duplicate.api.ts` (moved from `features/duplicate/api`, shim left) with `includeChildren` |
-| Preview | `PreviewActionHelper.openWindows(contents)` (`app/action/PreviewActionHelper.ts`) with the default portal preview; previewable = has page, is site, or is media |
+| Preview | `PreviewActionHelper.openWindows(contents)` (`app/action/PreviewActionHelper.ts`) with the default portal preview for every targeted item |
 | Widget mount | `pages/browse/BrowseAppShell.tsx` next to the app-level dialogs |
 | Notifications | `showWarning` from `@enonic/lib-admin-ui/notify/MessageBus` |
 
@@ -408,9 +408,11 @@ Acceptance:
 - Duplicate: children question → `duplicateChildren`. "Yes"/"no" leaves filter mode if active, duplicates with or
   without children via `duplicateContent`, expands the originals' parent and speaks the matching reply; "cancel"
   cancels.
-- Preview: one tab per previewable resolved item (has a page, is a site, or is media) via
-  `PreviewActionHelper.openWindows` with the default portal preview (the active preview widget lives in the
-  widgets layer, out of reach for a feature); non-previewable items are skipped; if none can, the none reply.
+- Preview: one tab per resolved item via `PreviewActionHelper.openWindows` with the default portal preview.
+  Whether an item renders is only known by rendering it (most content uses a page template and has no page of
+  its own), and the preview widget that decides this lives in the widgets layer, out of reach for a feature; so
+  every target is opened and the preview page itself reports what cannot render (a page-flag check wrongly
+  refused posts, 2026-09-14).
 - "Cancel" and "let's try again" work in every prompt as in the create dialog.
 - Toolbar actions do not change the selection; the mouse selection stays whatever it was.
 

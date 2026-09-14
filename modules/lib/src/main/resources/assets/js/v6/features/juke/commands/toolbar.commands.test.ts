@@ -188,13 +188,13 @@ describe('toolbar actions', () => {
         expect(mocks.openEditContentTab).toHaveBeenCalledTimes(3);
     });
 
-    it('should preview only previewable items', async () => {
+    it('should open a preview for every targeted item', async () => {
         mocks.resolveTarget.mockResolvedValue(itemsResolution([post, folder, image]));
-        expect(await say('preview all')).toEqual({ say: 'juke.reply.preview.openingMany|2' });
-        expect(mocks.openWindows).toHaveBeenCalledWith([post, image]);
+        expect(await say('preview all')).toEqual({ say: 'juke.reply.preview.openingMany|3' });
+        expect(mocks.openWindows).toHaveBeenCalledWith([post, folder, image]);
 
         mocks.resolveTarget.mockResolvedValue(itemsResolution([folder]));
-        expect(await say('preview archive')).toEqual({ say: 'juke.reply.preview.none|Archive' });
+        expect(await say('preview archive')).toEqual({ say: 'juke.reply.preview.opening|Archive' });
     });
 
     it('should ask before deleting and archive on yes', async () => {

@@ -108,11 +108,6 @@ async function runTask(request: ResultAsync<TaskId, AppError>, actionLabel: stri
     });
 }
 
-function isPreviewable(item: ContentSummary): boolean {
-    const type = item.getType();
-    return item.isPage() || item.isSite() || type.isMedia() || type.isDescendantOfMedia();
-}
-
 function ask(action: ActionFlow['action'], items: ContentSummary[], label: string): JukeReply {
     startActionFlow({ action, items, label });
     switch (action) {
@@ -152,19 +147,17 @@ export const toolbarCommand: JukeCommand<ToolbarArgs> = {
                             ? i18n('juke.reply.edit.opening', label)
                             : i18n('juke.reply.edit.openingMany', items.length),
                 };
-            case 'preview': {
-                const previewable = items.filter(isPreviewable);
-                if (previewable.length === 0) {
-                    return { say: i18n('juke.reply.preview.none', label) };
-                }
-                new PreviewActionHelper().openWindows(previewable);
+            case 'preview':
+                // Whether an item renders is only known by rendering it (most content
+                // uses a page template and has no page of its own), so every target is
+                // opened and the preview page itself reports what cannot render.
+                new PreviewActionHelper().openWindows(items);
                 return {
                     say:
-                        previewable.length === 1
-                            ? i18n('juke.reply.preview.opening', previewable[0].getDisplayName())
-                            : i18n('juke.reply.preview.openingMany', previewable.length),
+                        items.length === 1
+                            ? i18n('juke.reply.preview.opening', label)
+                            : i18n('juke.reply.preview.openingMany', items.length),
                 };
-            }
             case 'move':
                 if (items.length > 1 && targetSpecs(args, context)[0]?.kind === 'all') {
                     return { say: i18n('juke.reply.move.notAll') };
