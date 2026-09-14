@@ -12,7 +12,7 @@ import { trackTask } from '../../../entities/task/task.service';
 import type { AppError } from '../../../shared/api/errors';
 import { $actionFlow, resetActionFlow, startActionFlow, type ActionFlow } from '../model/actionFlow.store';
 import type { JukeCommand, JukeContext, JukeReply } from './command.types';
-import { canHoldChildren, findContentByName } from './content-lookup';
+import { canHoldChildren, findContentByName, spokenName } from './content-lookup';
 import { parseAlternatives } from './matching';
 import { parseTarget, resolveTarget, type TargetSpec } from './target';
 import { expandInTree, leaveFilterMode } from './tree-reveal';
@@ -226,6 +226,7 @@ export const moveTargetCommand: JukeCommand<MoveTargetArgs> = {
         }
 
         let destination: ContentSummary | undefined;
+        let destinationName: string | undefined;
         if (answer.kind === 'named') {
             const movedIds = new Set(flow.items.map((item) => item.getContentId().toString()));
             const movedPaths = flow.items.map((item) => `${item.getPath().toString()}/`);
@@ -243,6 +244,7 @@ export const moveTargetCommand: JukeCommand<MoveTargetArgs> = {
                 const result = await findContentByName(name, { accept });
                 if (result.kind === 'match') {
                     destination = result.value;
+                    destinationName = spokenName(result.value, result.labelIndex);
                     break;
                 }
                 if (result.kind === 'ambiguous') {
@@ -279,7 +281,7 @@ export const moveTargetCommand: JukeCommand<MoveTargetArgs> = {
         }
         return finished(
             destination != null
-                ? i18n('juke.reply.move.done', flow.label, destination.getDisplayName())
+                ? i18n('juke.reply.move.done', flow.label, destinationName ?? destination.getDisplayName())
                 : i18n('juke.reply.move.doneRoot', flow.label),
         );
     },

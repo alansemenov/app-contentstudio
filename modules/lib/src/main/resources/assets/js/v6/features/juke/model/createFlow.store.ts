@@ -12,6 +12,8 @@ import type { ContentSummary } from '../../../../app/content/ContentSummary';
 export type CreateFlow = {
     type: ContentTypeSummary;
     parent?: ContentSummary;
+    // How Juke refers to the parent in replies (display name or path name).
+    parentName?: string;
 };
 
 export const $createFlow = atom<CreateFlow | null>(null);
@@ -20,12 +22,12 @@ export function startCreateFlow(type: ContentTypeSummary): void {
     $createFlow.set({ type });
 }
 
-export function setCreateFlowParent(parent: ContentSummary | undefined): void {
+export function setCreateFlowParent(parent: ContentSummary | undefined, parentName?: string): void {
     const flow = $createFlow.get();
     if (flow == null) {
         return;
     }
-    $createFlow.set({ ...flow, parent });
+    $createFlow.set({ ...flow, parent, parentName });
 }
 
 export function resetCreateFlow(): void {

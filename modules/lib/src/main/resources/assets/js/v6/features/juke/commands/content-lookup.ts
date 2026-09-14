@@ -56,13 +56,25 @@ export function canHoldChildren(content: ContentSummary): boolean {
     return !type.isMedia() && !type.isDescendantOfMedia() && !type.isPageTemplate();
 }
 
+// Labels are matched in this order; index 1 is the path name.
+export function contentLabels(content: ContentSummary): string[] {
+    return [content.getDisplayName(), content.getName().toString()];
+}
+
+// The name Juke uses for an item in replies: its display name, unless the item
+// was matched through its path name ("stuff-copy" among several "stuff"), which
+// is then the unambiguous thing to say back.
+export function spokenName(content: ContentSummary, labelIndex: number): string {
+    return labelIndex === 1 ? content.getName().toString() : content.getDisplayName();
+}
+
 export async function findContentByName(
     spokenName: string,
     options: ContentLookupOptions = {},
 ): Promise<MatchResult<ContentSummary>> {
     const hits = await searchContentByText(spokenName, options);
     return bestUniqueMatch(
-        hits.map((content) => ({ value: content, labels: [content.getDisplayName(), content.getName().toString()] })),
+        hits.map((content) => ({ value: content, labels: contentLabels(content) })),
         spokenName,
     );
 }

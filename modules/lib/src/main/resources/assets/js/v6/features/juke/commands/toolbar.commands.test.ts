@@ -56,12 +56,12 @@ vi.mock('./tree-reveal', () => ({
     leaveFilterMode: mocks.leaveFilterMode,
     expandInTree: mocks.expandInTree,
 }));
-vi.mock('./content-lookup', () => ({
-    findContentByName: mocks.findContentByName,
-    canHoldChildren: () => true,
-}));
+vi.mock('./content-lookup', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('./content-lookup')>();
+    return { ...actual, findContentByName: mocks.findContentByName, canHoldChildren: () => true };
+});
 
-type ItemOptions = { page?: boolean; site?: boolean; media?: boolean; path?: string };
+type ItemOptions = { page?: boolean; site?: boolean; media?: boolean; path?: string; name?: string };
 
 const item = (id: string, displayName: string, options: ItemOptions = {}): ContentSummary => {
     const contentId = { toString: () => id };
@@ -76,6 +76,7 @@ const item = (id: string, displayName: string, options: ItemOptions = {}): Conte
     return {
         getId: () => id,
         getDisplayName: () => displayName,
+        getName: () => ({ toString: () => options.name ?? id }),
         getContentId: () => contentId,
         getPath: () => path,
         isPage: () => options.page === true,
@@ -160,7 +161,7 @@ describe('toolbar actions', () => {
             config.onComplete('SUCCESS');
             return () => undefined;
         });
-        mocks.findContentByName.mockResolvedValue({ kind: 'match', value: blogs });
+        mocks.findContentByName.mockResolvedValue({ kind: 'match', value: blogs, labelIndex: 0 });
         mocks.leaveFilterMode.mockResolvedValue(undefined);
         mocks.expandInTree.mockResolvedValue(undefined);
     });
@@ -252,6 +253,17 @@ describe('toolbar actions', () => {
         expect(mocks.expandInTree).toHaveBeenCalledWith(blogs.getPath());
         expect(mocks.showSuccess).toHaveBeenCalledWith('notify.items.moved.to.single|1 /superhero/blogs');
         expect(mocks.showSuccess).toHaveBeenCalledWith('notify.items.moved.to.single|1 /superhero/blogs');
+    });
+
+    it('should name a destination matched through its path name', async () => {
+        const copy = item('blogs-copy', 'Blogs', { path: '/superhero/blogs-copy', name: 'blogs-copy' });
+        mocks.findContentByName.mockResolvedValue({ kind: 'match', value: copy, labelIndex: 1 });
+        await say('move summer news');
+
+        expect(await say('under blogs copy', 'moveTarget')).toEqual({
+            say: 'juke.reply.move.done|Summer news|blogs-copy',
+            prompt: null,
+        });
     });
 
     it('should exclude the moved items and their descendants as destinations', async () => {

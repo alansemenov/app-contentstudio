@@ -14,7 +14,10 @@ export type MatchCandidate<T> = {
     labels: readonly string[];
 };
 
-export type MatchResult<T> = { kind: 'match'; value: T } | { kind: 'ambiguous'; values: T[] } | { kind: 'none' };
+export type MatchResult<T> =
+    | { kind: 'match'; value: T; labelIndex: number }
+    | { kind: 'ambiguous'; values: T[] }
+    | { kind: 'none' };
 
 type Tier = (label: string, spoken: string, spokenWords: string[]) => boolean;
 
@@ -28,7 +31,7 @@ const TIERS: readonly Tier[] = [
     },
 ];
 
-function uniqueValues<T>(hits: MatchCandidate<T>[]): T[] {
+function uniqueValues<T>(hits: readonly { value: T }[]): T[] {
     return [...new Set(hits.map((hit) => hit.value))];
 }
 
@@ -62,16 +65,22 @@ export function bestUniqueMatch<T>(candidates: readonly MatchCandidate<T>[], spo
 
     const normalized = candidates.map((candidate) => ({
         value: candidate.value,
-        labels: candidate.labels.map(normalizeTranscript).filter((label) => label.length > 0),
+        // Index kept so the caller knows which label (display name, name, ...) matched.
+        labels: candidate.labels
+            .map((label, index) => ({ index, text: normalizeTranscript(label) }))
+            .filter((label) => label.text.length > 0),
     }));
 
     for (const tier of TIERS) {
-        const hits = normalized.filter((candidate) =>
-            candidate.labels.some((label) => tier(label, spoken, spokenWords)),
-        );
+        const hits = normalized
+            .map((candidate) => ({
+                value: candidate.value,
+                labelIndex: candidate.labels.find((label) => tier(label.text, spoken, spokenWords))?.index ?? -1,
+            }))
+            .filter((hit) => hit.labelIndex >= 0);
         const values = uniqueValues(hits);
         if (values.length === 1) {
-            return { kind: 'match', value: values[0] };
+            return { kind: 'match', value: values[0], labelIndex: hits[0].labelIndex };
         }
         if (values.length > 1) {
             return { kind: 'ambiguous', values };

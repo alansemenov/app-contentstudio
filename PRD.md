@@ -245,7 +245,10 @@ Behaviour:
   command pattern may carry a misheard name ("expand both" with "expand posts" as second guess).
 - Matching (`commands/matching.ts`, `bestUniqueMatch`): labels and the spoken name are normalized; tiers are
   tried in order — exact, label starts with spoken, containment either way, every spoken word in the label —
-  and the first tier with hits decides. More than one hit is ambiguous and reported as not found.
+  and the first tier with hits decides. More than one hit is ambiguous and reported as not found. The result
+  carries which label matched; content is matched on display name and path name, and when the match came through
+  the path name Juke says the path name back (`spokenName`): two items both displayed "stuff" with names "stuff"
+  and "stuff-copy" — "delete stuff-copy" confirms "delete stuff-copy", "delete stuff" is ambiguous.
 - Content lookup (`commands/content-lookup.ts`, `findContentByName`): runs the browse filter's free-text query
   (fulltext + ngram over `displayName^5`, `_name^3`, `_allText`, draft branch, current project, 50 hits) via
   `queryContent` — the endpoint needs `contentTypeNames`, `queryFilters` and `aggregationQueries` present even

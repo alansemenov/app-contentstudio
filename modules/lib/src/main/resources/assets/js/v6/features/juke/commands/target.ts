@@ -2,7 +2,7 @@ import { i18n } from '@enonic/lib-admin-ui/util/Messages';
 import type { ContentSummary } from '../../../../app/content/ContentSummary';
 import { getContent, getCurrentItems } from '../../../entities/content';
 import type { JukeReply } from './command.types';
-import { findContentByName } from './content-lookup';
+import { findContentByName, spokenName } from './content-lookup';
 import { bestUniqueMatch } from './matching';
 import { getVisibleNodes } from './tree.commands';
 
@@ -109,7 +109,7 @@ async function resolveOne(spec: TargetSpec): Promise<TargetResolution> {
             if (visible.kind === 'match') {
                 const item = visible.value.data.item ?? getContent(visible.value.id);
                 if (item != null) {
-                    return items([item]);
+                    return { kind: 'items', items: [item], label: spokenName(item, visible.labelIndex) };
                 }
             }
             if (visible.kind === 'ambiguous') {
@@ -117,7 +117,11 @@ async function resolveOne(spec: TargetSpec): Promise<TargetResolution> {
             }
             const anywhere = await findContentByName(spec.name);
             if (anywhere.kind === 'match') {
-                return items([anywhere.value]);
+                return {
+                    kind: 'items',
+                    items: [anywhere.value],
+                    label: spokenName(anywhere.value, anywhere.labelIndex),
+                };
             }
             if (anywhere.kind === 'ambiguous') {
                 return reply(i18n('juke.reply.target.ambiguous', spec.name));

@@ -1,7 +1,13 @@
 import { errAsync, okAsync } from 'neverthrow';
 import type { ContentSummary } from '../../../../app/content/ContentSummary';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildTextSearchQuery, canHoldChildren, findContentByName, searchContentByText } from './content-lookup';
+import {
+    buildTextSearchQuery,
+    canHoldChildren,
+    findContentByName,
+    searchContentByText,
+    spokenName,
+} from './content-lookup';
 
 const { mockQueryContent } = vi.hoisted(() => ({ mockQueryContent: vi.fn() }));
 
@@ -77,6 +83,14 @@ describe('canHoldChildren', () => {
         expect(canHoldChildren(summary('1', 'Site'))).toBe(true);
         expect(canHoldChildren(summary('2', 'hero.jpg', 'image'))).toBe(false);
         expect(canHoldChildren(summary('3', 'Default', 'template'))).toBe(false);
+    });
+});
+
+describe('spokenName', () => {
+    it('should use the path name only when the match came through it', () => {
+        const copy = summary('2', 'Stuff');
+        expect(spokenName(copy, 0)).toBe('Stuff');
+        expect(spokenName(copy, 1)).toBe('stuff');
     });
 });
 

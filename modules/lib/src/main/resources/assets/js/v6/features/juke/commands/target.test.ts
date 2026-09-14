@@ -21,18 +21,20 @@ vi.mock('../../../entities/content', () => ({
     getContent: mocks.getContent,
 }));
 
-vi.mock('./content-lookup', () => ({
-    findContentByName: mocks.findContentByName,
-}));
+vi.mock('./content-lookup', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('./content-lookup')>();
+    return { ...actual, findContentByName: mocks.findContentByName };
+});
 
 vi.mock('./tree.commands', () => ({
     getVisibleNodes: mocks.getVisibleNodes,
 }));
 
-const item = (id: string, displayName: string): ContentSummary =>
+const item = (id: string, displayName: string, name = displayName.toLowerCase()): ContentSummary =>
     ({
         getId: () => id,
         getDisplayName: () => displayName,
+        getName: () => ({ toString: () => name }),
         getContentId: () => ({ toString: () => id }),
     }) as unknown as ContentSummary;
 
@@ -41,7 +43,7 @@ const node = (summary: ContentSummary) => ({
     data: {
         id: summary.getId(),
         displayName: summary.getDisplayName(),
-        name: summary.getDisplayName().toLowerCase(),
+        name: summary.getName().toString(),
         item: summary,
     },
 });
@@ -106,9 +108,29 @@ describe('resolveTarget', () => {
     it('should resolve names among visible rows first, then anywhere in the project', async () => {
         expect(await resolveTarget([parseTarget('posts')])).toMatchObject({ items: [posts] });
 
-        mocks.findContentByName.mockResolvedValue({ kind: 'match', value: news });
-        expect(await resolveTarget([parseTarget('news')])).toMatchObject({ items: [news] });
+        mocks.findContentByName.mockResolvedValue({ kind: 'match', value: news, labelIndex: 0 });
+        expect(await resolveTarget([parseTarget('news')])).toMatchObject({ items: [news], label: 'News' });
         expect(mocks.findContentByName).toHaveBeenCalledWith('news');
+    });
+
+    it('should speak the path name when the item was matched through it', async () => {
+        const stuff = item('s1', 'stuff', 'stuff');
+        const copy = item('s2', 'stuff', 'stuff-copy');
+        mocks.getVisibleNodes.mockReturnValue([node(stuff), node(copy)]);
+
+        expect(await resolveTarget([parseTarget('stuff copy')])).toEqual({
+            kind: 'items',
+            items: [copy],
+            label: 'stuff-copy',
+        });
+        expect(await resolveTarget([parseTarget('stuff')])).toEqual({
+            kind: 'reply',
+            reply: { say: 'juke.reply.target.ambiguous|stuff' },
+        });
+
+        mocks.getVisibleNodes.mockReturnValue([]);
+        mocks.findContentByName.mockResolvedValue({ kind: 'match', value: copy, labelIndex: 1 });
+        expect(await resolveTarget([parseTarget('stuff copy')])).toMatchObject({ label: 'stuff-copy' });
     });
 
     it('should report unknown and ambiguous names', async () => {

@@ -23,7 +23,7 @@ import {
     type CreateFlow,
 } from '../model/createFlow.store';
 import type { JukeCommand, JukeReply } from './command.types';
-import { canHoldChildren, findContentByName } from './content-lookup';
+import { canHoldChildren, findContentByName, spokenName } from './content-lookup';
 import { expandInTree, leaveFilterMode } from './tree-reveal';
 import { bestUniqueMatch, parseAlternatives } from './matching';
 
@@ -182,6 +182,7 @@ export const createParentCommand: JukeCommand<CreateParentArgs> = {
         const title = flow.type.getTitle();
 
         let parent: ContentSummary | undefined;
+        let parentName: string | undefined;
         if (args.kind === 'named') {
             const names = parseAlternatives(context.alternatives, args.name, (text) => {
                 const parsed = parseCreateParent(text);
@@ -192,6 +193,7 @@ export const createParentCommand: JukeCommand<CreateParentArgs> = {
                 const result = await findContentByName(candidate, { accept: canHoldChildren });
                 if (result.kind === 'match') {
                     parent = result.value;
+                    parentName = spokenName(result.value, result.labelIndex);
                     break;
                 }
                 if (result.kind === 'ambiguous' && ambiguous == null) {
@@ -209,12 +211,12 @@ export const createParentCommand: JukeCommand<CreateParentArgs> = {
             return {
                 say:
                     parent != null
-                        ? i18n('juke.reply.create.notAllowed', title, parent.getDisplayName())
+                        ? i18n('juke.reply.create.notAllowed', title, parentName ?? parent.getDisplayName())
                         : i18n('juke.reply.create.notAllowedRoot', title),
             };
         }
 
-        setCreateFlowParent(parent);
+        setCreateFlowParent(parent, parentName);
         return { say: i18n('juke.reply.create.askName', title), prompt: 'createName' };
     },
 };
@@ -248,7 +250,7 @@ export const createNameCommand: JukeCommand<CreateNameArgs> = {
             return { say: i18n('juke.reply.create.failed', title), prompt: null };
         }
 
-        const parentName = flow.parent?.getDisplayName();
+        const parentName = flow.parentName ?? flow.parent?.getDisplayName();
         resetCreateFlow();
         return {
             say:

@@ -108,6 +108,10 @@ vi.mock('./tree-reveal', () => ({
 vi.mock('./content-lookup', () => ({
     findContentByName: mocks.findContentByName,
     canHoldChildren: () => true,
+    spokenName: (
+        content: { getName: () => { toString: () => string }; getDisplayName: () => string },
+        labelIndex: number,
+    ) => (labelIndex === 1 ? content.getName().toString() : content.getDisplayName()),
 }));
 
 const type = (
@@ -131,9 +135,10 @@ const blog = type('blog-post', 'Blog Post');
 const article = type('article', 'Article');
 const allTypes = [blog, article, type('image', 'Image', { media: true }), type('base', 'Base', { abstract: true })];
 
-const summary = (id: string, displayName: string, path: string) => ({
+const summary = (id: string, displayName: string, path: string, name = displayName.toLowerCase()) => ({
     getContentId: () => id,
     getDisplayName: () => displayName,
+    getName: () => ({ toString: () => name }),
     getPath: () => path,
 });
 
@@ -260,7 +265,7 @@ describe('create dialog', () => {
         mocks.makeNewContentRequest.mockReturnValue(request);
         mocks.contentExistsByPath.mockReturnValue(okAsync(false));
         $config.setKey('allowPathTransliteration', true);
-        mocks.findContentByName.mockResolvedValue({ kind: 'match', value: blogs });
+        mocks.findContentByName.mockResolvedValue({ kind: 'match', value: blogs, labelIndex: 0 });
         mocks.revealContentByPath.mockResolvedValue(undefined);
         mocks.leaveFilterMode.mockResolvedValue(undefined);
         mocks.expandInTree.mockResolvedValue(undefined);
@@ -289,7 +294,7 @@ describe('create dialog', () => {
         });
 
         mocks.findContentByName.mockImplementation(async (name: string) =>
-            name === 'blogs' ? { kind: 'match', value: blogs } : { kind: 'none' },
+            name === 'blogs' ? { kind: 'match', value: blogs, labelIndex: 0 } : { kind: 'none' },
         );
         const parentCtx: JukeContext = { ...context('createParent'), alternatives: ['under blocks', 'under blogs'] };
         const parentStep = resolveCommand(['under blocks'], parentCtx)!;
