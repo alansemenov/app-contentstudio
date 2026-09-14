@@ -4,6 +4,7 @@ import { registerCommands, resolveCommand } from '../commands/command.registry';
 import type { JukeReply } from '../commands/command.types';
 import { allCommands } from '../commands/all.commands';
 import { stripJukeAddress } from '../commands/session.commands';
+import { isEchoOf } from '../speech/echo';
 import { normalizeTranscript } from '../speech/normalize';
 import {
     createRecognizer as defaultCreateRecognizer,
@@ -48,6 +49,14 @@ let deps: Required<JukeServiceDeps> = {
 // Replies are spoken one after another, never interleaved.
 let queue: Promise<void> = Promise.resolve();
 
+// Recognition keeps running while Juke speaks so a quick answer is not lost in
+// the recognizer's restart gap. Transcripts finalized during speech, shortly
+// after it, or echoing what was just said are dropped instead.
+export const ECHO_GRACE_MS = 250;
+let speaking = false;
+let speechEndedAt = 0;
+let lastSpoken: string | null = null;
+
 // A command that neither answers nor fails within this time is treated as failed,
 // so Juke never falls silent with the queue blocked behind it.
 export const COMMAND_TIMEOUT_MS = 20_000;
@@ -75,10 +84,13 @@ const enqueue = (task: () => Promise<void>): void => {
 
 const respond = async (reply: JukeReply): Promise<void> => {
     setJukeActivity('speaking');
-    recognizer?.pause();
+    speaking = true;
+    lastSpoken = reply.say;
     try {
         await speaker?.speak(reply.say);
     } finally {
+        speaking = false;
+        speechEndedAt = Date.now();
         setJukeActivity('listening');
         if (reply.prompt !== undefined) {
             setJukePrompt(reply.prompt);
@@ -86,13 +98,23 @@ const respond = async (reply: JukeReply): Promise<void> => {
         if (reply.mode != null) {
             setJukeMode(reply.mode);
         }
-        recognizer?.resume();
     }
+};
+
+const isSelfEcho = (normalized: readonly string[]): boolean => {
+    if (speaking || Date.now() - speechEndedAt < ECHO_GRACE_MS) {
+        return true;
+    }
+    return normalized.every((text) => isEchoOf(text, lastSpoken));
 };
 
 const handleTranscripts = (alternatives: string[]): void => {
     const normalized = alternatives.map(normalizeTranscript).filter((text) => text.length > 0);
     if (normalized.length === 0) {
+        return;
+    }
+    if (isSelfEcho(normalized)) {
+        console.info('[juke] ignored own speech', JSON.stringify(normalized[0]));
         return;
     }
     setJukeTranscript(normalized[0]);
@@ -143,6 +165,9 @@ const deactivate = (): void => {
     resetJukeState();
     resetCreateFlow();
     resetSearchFlow();
+    speaking = false;
+    speechEndedAt = 0;
+    lastSpoken = null;
 };
 
 const handleDenied = (): void => {

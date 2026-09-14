@@ -4,7 +4,7 @@ import { $config } from '../../../shared/config/config.store';
 import { clearCommands, registerCommands } from '../commands/command.registry';
 import type { Recognizer, RecognizerHandlers } from '../speech/recognizer';
 import type { Speaker } from '../speech/speaker';
-import { start, stop } from './juke.service';
+import { ECHO_GRACE_MS, start, stop } from './juke.service';
 import { $jukeActivity, $jukeMode, $jukePrompt, $jukeSpeechSupported, $jukeTranscript } from './juke.store';
 
 const { mockShowWarning } = vi.hoisted(() => ({ mockShowWarning: vi.fn() }));
@@ -86,10 +86,13 @@ const hear = async (...alternatives: string[]): Promise<void> => {
     await flush();
 };
 
+// Resolves the current utterance and steps past the echo grace window, as a
+// user answering a moment after Juke stops would.
 const finishSpeaking = async (): Promise<void> => {
     await flush();
     speeches.shift()?.resolve();
     await flush();
+    vi.advanceTimersByTime(ECHO_GRACE_MS + 50);
 };
 
 const makeAvailable = (): void => {
@@ -101,6 +104,7 @@ const makeAvailable = (): void => {
 
 describe('juke.service', () => {
     beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
         recognizers = [];
         speeches = [];
         speakerCancels = 0;
@@ -113,6 +117,7 @@ describe('juke.service', () => {
 
     afterEach(() => {
         stop();
+        vi.useRealTimers();
     });
 
     it('stays off until the operator is running in browse mode with speech support', () => {
@@ -157,14 +162,14 @@ describe('juke.service', () => {
 
         expect($jukeMode.get()).toBe('dialog');
         expect($jukeActivity.get()).toBe('speaking');
-        expect(latest().pauseCalls).toBe(1);
+        expect(latest().pauseCalls).toBe(0);
         expect(speeches).toHaveLength(1);
         expect(speeches[0].text).toBe('juke.reply.hello|Alan');
 
         await finishSpeaking();
 
         expect($jukeActivity.get()).toBe('listening');
-        expect(latest().resumeCalls).toBe(1);
+        expect(latest().resumeCalls).toBe(0);
         expect($jukeMode.get()).toBe('dialog');
     });
 
@@ -211,6 +216,31 @@ describe('juke.service', () => {
 
         await hear('hey juke, how are you?');
 
+        expect(speeches[0].text).toBe('juke.reply.smalltalk.howAreYou|Alan');
+    });
+
+    it('ignores what it hears while speaking and its own echo afterwards', async () => {
+        start({ createRecognizer, createSpeaker });
+        makeAvailable();
+
+        await hear('hello juke');
+        expect($jukeActivity.get()).toBe('speaking');
+        await hear('go to superhero');
+        expect(speeches).toHaveLength(1);
+
+        await flush();
+        speeches.shift()?.resolve();
+        await flush();
+        vi.advanceTimersByTime(100);
+        await hear('yes');
+        expect(speeches).toHaveLength(0);
+
+        vi.advanceTimersByTime(ECHO_GRACE_MS);
+        await hear('juke reply hello alan');
+        expect(speeches).toHaveLength(0);
+        expect($jukeTranscript.get()).toBe('hello juke');
+
+        await hear('how are you');
         expect(speeches[0].text).toBe('juke.reply.smalltalk.howAreYou|Alan');
     });
 

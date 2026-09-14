@@ -198,6 +198,7 @@ export const searchCriteriaCommand: JukeCommand<SearchAnswer> = {
         }
 
         const { hits } = await runSearch(resolution.criteria);
+        console.info('[juke] search', JSON.stringify(resolution.criteria), '-> hits', hits);
         updateSearchFlow({ ...resolution.criteria, hits });
         if (hits === 0) {
             return { say: i18n('juke.reply.search.none') };

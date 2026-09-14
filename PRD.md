@@ -25,7 +25,7 @@ is not used functionally, only as a gate.
 | Icon | Reuse `v6/shared/ui/icons/JukeIcon.tsx` | Same branding as the operator toggle in the wizard toolbar. |
 | Icon animations | Accepting commands: "breathe" (slow scale 1→1.06 with a green glow and a faint ring, 2.6 s loop). Answering: "bars" (four-bar equalizer pill to the left of the icon, icon bobs). Glow color is theme-aware: deep green on light, pale mint `#a2ffbd` on dark. Icon size 64 px, fixed bottom-right. | Chosen by the user on 2026-09-10 in the voice picker; pale mint alone was invisible on the light theme. |
 | Language | English only (`en-US`) for recognition and synthesis. | Spec phrases are English; can be made configurable later. |
-| Voice | `speechSynthesis` voice "Google US English" (`en-US`, online). Fallback: first `en-US` voice, then first `en` voice. Rate and pitch 1.0 unless tuned later. Recognition has always been `en-US`. | Chosen "Google UK English Male" on 2026-09-10; switched to the US voice on 2026-09-14 at the user's request. Chrome ships no Google US English male voice, so this one is female. |
+| Voice | `speechSynthesis` voice "Google UK English Male" (`en-GB`, online). Fallback: first `en-GB` voice, then first `en` voice. Rate and pitch 1.0 unless tuned later. Recognition is `en-US`. | Chosen on 2026-09-10 with the voice picker; briefly switched to "Google US English" on 2026-09-14 and rolled back the same day (the US Google voice is female only). |
 | Delivery | Feature branch `juke-voice` off `master`, one or a few commits per milestone. Jar renamed to `hackathon.jar` (done). | User choice. |
 | Code location | All new code under `modules/lib/src/main/resources/assets/js/v6/features/juke/` (Preact, strict TS, Tailwind, nanostores). Legacy `app/` is called into, never extended. | Project CLAUDE.md. |
 | Localization | All spoken and displayed strings in `phrases.properties` under `juke.*` keys. | Project convention. |
@@ -40,8 +40,8 @@ is not used functionally, only as a gate.
   restart automatically on `onend` unless stopped deliberately, with back-off after consecutive errors.
 - The `not-allowed` error (microphone denied) must stop the restart loop and show a one-time warning via
   lib-admin-ui `showWarning`.
-- Speaking while listening: recognition picks up Juke's own voice. Recognition is paused while `speechSynthesis`
-  is speaking and resumed on `onend` of the utterance.
+- Speaking while listening: recognition picks up Juke's own voice. Recognition stays on and the echo is filtered
+  out by timing and by word overlap with the last reply.
 - The browse page runs a strict CSP (`main.js` `applySecurityPolicy`). Web Speech API needs no `connect-src`
   changes. No new outbound endpoints are added.
 - Microphone permission requires a secure context (https or localhost).
@@ -128,7 +128,7 @@ phrase, so nothing falls through to the unknown reply while a question is open.
   if the first does not match any command.
 - Wake and sleep phrases accept common recognition variants: "hello juke", "hello, juke", "hello duke",
   "hello jook", "hey juke"; "goodbye juke", "good bye juke", "bye juke".
-- Recognition is paused while speaking; utterances recognized within 300 ms after speech ends are discarded.
+- Recognition is not paused while speaking; see the echo rules above.
 
 ### 4.3 Integration points (existing code, called not modified)
 
@@ -190,11 +190,13 @@ Behaviour:
 - "Goodbye, Juke" (also "bye juke", "see you juke") speaks the goodbye reply, then hides the icon and returns to
   idle listening. Session commands win over small talk and over any pending prompt.
 - Any other phrase in dialog mode gets the unknown reply.
-- Replies are spoken one at a time through a queue. Recognition is paused while speaking and resumed 300 ms
-  after the utterance ends, so Juke never transcribes itself. A command that throws or takes longer than 20 s
+- Replies are spoken one at a time through a queue. Recognition keeps running while Juke speaks (pausing it lost
+  quick answers in the recognizer's restart gap); transcripts finalized while speaking or within 250 ms after,
+  and transcripts whose words are at least 60 % contained in the last reply (`speech/echo.ts`), are dropped as
+  Juke's own echo. A command that throws or takes longer than 20 s
   gets `juke.reply.failed` spoken and logged, so Juke never falls silent. Every recognized phrase and the
   resolved command id are logged with `console.info('[juke] heard', ...)` for diagnosis.
-- Voice: "Google US English", falling back to the first `en-US` voice, then the first `en` voice. Rate and
+- Voice: "Google UK English Male", falling back to the first `en-GB` voice, then the first `en` voice. Rate and
   pitch 1.0. Utterances resolve on `end`, `error`, or a safety timeout of max(3 s, 120 ms per character).
 - Recognizer: continuous, final results only, 3 alternatives, `en-US`. Restarts on every `end` while active;
   backs off 1 s → 10 s after `network`/`audio-capture` errors, resets after a result; stops for good on

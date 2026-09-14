@@ -36,10 +36,14 @@ export type SearchRun = {
 
 function lastModifiedBucket(range: LastModifiedRange, now: number): DateRangeBucket {
     const isDay = range === 'day';
+    // The panel's buckets carry the server's ISO strings, and the range filter
+    // serializes `from` with toString(), so a real Date would produce a locale
+    // string the server rejects. Mirror the server shape: an ISO string.
+    const from = new Date(now - (isDay ? DAY_MS : WEEK_MS)).toISOString() as unknown as Date;
     return DateRangeBucket.fromDateRangeJson({
         key: i18n(isDay ? 'field.lastModified.lessDay' : 'field.lastModified.lessWeek'),
         docCount: 0,
-        from: new Date(now - (isDay ? DAY_MS : WEEK_MS)),
+        from,
         to: null,
     });
 }
