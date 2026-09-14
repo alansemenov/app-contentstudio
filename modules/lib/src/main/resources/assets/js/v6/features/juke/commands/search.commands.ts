@@ -48,6 +48,24 @@ export type ShowAnswer = { kind: 'yes' } | { kind: 'no' };
 // for "new", and "usage" for the whole phrase.
 const START_PATTERN =
     /^(?:(?:lets|let us|please)\s+)?(?:(?:do|start|make|begin|run)\s+)?(?:a\s+|another\s+|and\s+)?(?:(?:new|you|use|knew|nu)\s+)?(?:search|surge)(?:\s+again)?$|^(?:reset|restart|clear)\s+(?:the\s+)?search$|^usage$/;
+
+// Short aliases that recognition gets right more often than "new search". With
+// criteria after the verb ("find posts modified today") the search runs at once.
+const FIND_PATTERN = /^(?:find|look up|lookup|look for|search for)(?:\s+(.+))?$/;
+
+export type SearchStartArgs = { criteria?: string };
+
+export function parseSearchStart(text: string): SearchStartArgs | null {
+    if (START_PATTERN.test(text)) {
+        return {};
+    }
+    const find = FIND_PATTERN.exec(text);
+    if (find) {
+        return find[1] ? { criteria: find[1].trim() } : {};
+    }
+    return null;
+}
+
 const RESTART_PATTERN = /^(?:lets|let us)?\s*(?:try again|start over|start again|restart)$/;
 const YES_PATTERN = /^(?:yes|yeah|yep|sure|please|ok|okay|show me|show them|yes please|show)$/;
 
@@ -204,17 +222,36 @@ function uniqueBy<T>(items: readonly T[], key: (item: T) => string): T[] {
     });
 }
 
+async function searchWith(parsed: ParsedCriteria): Promise<JukeReply> {
+    const resolution = await resolveCriteria($searchFlow.get() ?? emptySearchCriteria(), parsed);
+    if ('reply' in resolution) {
+        return resolution.reply;
+    }
+
+    const { hits } = await runSearch(resolution.criteria);
+    console.info('[juke] search', JSON.stringify(resolution.criteria), '-> hits', hits);
+    updateSearchFlow({ ...resolution.criteria, hits });
+    if (hits === 0) {
+        return { say: i18n('juke.reply.search.none') };
+    }
+    return { say: i18n('juke.reply.search.found', hits), prompt: 'showResults' };
+}
+
 // Accepted in every prompt so "new search" always resets and starts afresh,
 // whatever question was open.
-export const searchStartCommand: JukeCommand<true> = {
+export const searchStartCommand: JukeCommand<SearchStartArgs> = {
     id: 'search.start',
     modes: ['dialog'],
-    match: (text) => (START_PATTERN.test(text) ? true : null),
-    run: () => {
+    match: (text) => parseSearchStart(text),
+    run: async ({ criteria }) => {
         resetContentFilter();
         resetCreateFlow();
         resetActionFlow();
         startSearchFlow();
+        if (criteria != null) {
+            const reply = await searchWith(parseCriteria(criteria));
+            return reply.prompt === undefined ? { ...reply, prompt: 'search' } : reply;
+        }
         return { say: i18n('juke.reply.search.start'), prompt: 'search' };
     },
 };
@@ -231,18 +268,7 @@ export const searchCriteriaCommand: JukeCommand<SearchAnswer> = {
             return { say: i18n('juke.reply.search.start'), prompt: 'search' };
         }
 
-        const resolution = await resolveCriteria($searchFlow.get() ?? emptySearchCriteria(), answer.parsed);
-        if ('reply' in resolution) {
-            return resolution.reply;
-        }
-
-        const { hits } = await runSearch(resolution.criteria);
-        console.info('[juke] search', JSON.stringify(resolution.criteria), '-> hits', hits);
-        updateSearchFlow({ ...resolution.criteria, hits });
-        if (hits === 0) {
-            return { say: i18n('juke.reply.search.none') };
-        }
-        return { say: i18n('juke.reply.search.found', hits), prompt: 'showResults' };
+        return searchWith(answer.parsed);
     },
 };
 

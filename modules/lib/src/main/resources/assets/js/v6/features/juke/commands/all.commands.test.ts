@@ -18,6 +18,8 @@ describe('allCommands registration order', () => {
     it.each([
         ['new search', 'search.start'],
         ['search', 'search.start'],
+        ['find summer news', 'search.start'],
+        ['look up posts', 'search.start'],
         ['expand superhero', 'tree.toggle'],
         ['collapse the blogs', 'tree.toggle'],
         ['go to superhero', 'project.goTo'],

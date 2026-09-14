@@ -307,7 +307,10 @@ Phrases:
 - `juke.reply.tree.leaf={0} has no child items.`
 
 Search acceptance:
-- "New search" resets the filter (if applied), enters the `search` prompt and speaks the start reply.
+- "New search" resets the filter (if applied), enters the `search` prompt and speaks the start reply. Short
+  aliases "find", "look up", "look for", "search for" do the same; with criteria after the verb ("find summer",
+  "look for content type post") the search runs immediately and Juke answers with the count, staying in
+  `search` on zero hits.
 - In `search`, each utterance is parsed left to right into criteria; several may appear in one utterance:
   `content type <x>`, `last modified by me|<user>`, `last modified today`, `last modified this week`,
   `in progress` ("last" also accepted as "lost"/"life"/"less", "modified" as "modify"). An utterance with

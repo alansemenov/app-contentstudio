@@ -243,12 +243,32 @@ describe('search dialog', () => {
         'use search',
         'and you search',
         'usage',
+        'find',
+        'look up',
+        'search for',
     ])('should start on "%s"', (text) => {
         expect(resolveCommand([text], context())?.command.id).toBe('search.start');
     });
 
+    it('should search at once when criteria follow the find verb', async () => {
+        expect(await say('find summer')).toEqual({ say: 'juke.reply.search.found|3', prompt: 'showResults' });
+        expect(mocks.runSearch).toHaveBeenLastCalledWith(expect.objectContaining({ keywords: ['summer'] }));
+        expect(mocks.resetContentFilter).toHaveBeenCalledTimes(1);
+
+        mocks.runSearch.mockResolvedValue({ hits: 0, modifierCandidates: [] });
+        expect(await say('search for unicorns')).toEqual({ say: 'juke.reply.search.none', prompt: 'search' });
+
+        expect(await say('look for content type post', 'createName')).toEqual({
+            say: 'juke.reply.search.none',
+            prompt: 'search',
+        });
+        expect(mocks.runSearch).toHaveBeenLastCalledWith(
+            expect.objectContaining({ contentTypes: [{ key: 'com.example:post', title: 'Post' }] }),
+        );
+    });
+
     it('should not start on phrases merely containing search', () => {
-        expect(resolveCommand(['search for summer'], context())).toBeNull();
+        expect(resolveCommand(['research'], context())).toBeNull();
     });
 
     it('should apply the criteria to the filter panel on yes and dismiss otherwise', async () => {
