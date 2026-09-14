@@ -148,6 +148,8 @@ describe('parseCreateStart', () => {
         ['make a folder', 'folder'],
         ['add a person', 'person'],
         ['new blog', 'blog'],
+        ['great new post', 'post'],
+        ['crate a post', 'post'],
     ])('should parse "%s" as type "%s"', (text, typeName) => {
         expect(parseCreateStart(text)).toEqual({ typeName });
     });

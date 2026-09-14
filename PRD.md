@@ -249,7 +249,8 @@ Behaviour:
   opening the dialog and answers with the project's display name. Only when no prompt is pending.
 - Content creation is a three-step dialog (`commands/content.commands.ts`, state in
   `model/createFlow.store.ts`):
-  1. "Create a <type>" (verbs "create", "make", "add", "new", optional "a"/"an"/"new"). The type is matched
+  1. "Create a <type>" (verbs "create", "make", "add", "new", plus "great"/"crate" as recognition hears
+     "create"; optional "a"/"an"/"new"). The type is matched
      against all non-abstract, non-media content types (`schema/content/all`) by title and local name. Not
      found: type-not-found reply, no prompt. Found: "Where do you want to create a new <Type>?" and prompt
      `createParent`.

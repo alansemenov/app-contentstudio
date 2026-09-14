@@ -145,6 +145,7 @@ const handleTranscripts = (alternatives: string[]): void => {
     console.info(
         '[juke] heard',
         JSON.stringify(candidates[0]),
+        candidates.length > 1 ? `(or ${JSON.stringify(candidates.slice(1))})` : '(single alternative)',
         '->',
         resolved?.command.id ?? 'no command',
         context.mode,
