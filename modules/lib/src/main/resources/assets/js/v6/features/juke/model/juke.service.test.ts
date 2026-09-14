@@ -244,6 +244,18 @@ describe('juke.service', () => {
         expect(speeches[0].text).toBe('juke.reply.smalltalk.howAreYou|Alan');
     });
 
+    it('keeps the answer when Chrome merges it with the end of the question', async () => {
+        start({ createRecognizer, createSpeaker });
+        makeAvailable();
+
+        await hear('hello juke');
+        await finishSpeaking();
+
+        await hear('what can i help you with today how are you');
+
+        expect(speeches[0].text).toBe('juke.reply.smalltalk.howAreYou|Alan');
+    });
+
     it('speaks a failure reply when a command throws instead of falling silent', async () => {
         start({ createRecognizer, createSpeaker });
         registerCommands({

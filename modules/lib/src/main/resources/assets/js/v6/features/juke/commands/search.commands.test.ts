@@ -185,17 +185,30 @@ describe('search dialog', () => {
         expect($searchFlow.get()?.keywords).toEqual(['unicorns']);
     });
 
-    it('should accumulate criteria across utterances', async () => {
+    it('should accumulate filters but replace keywords across utterances', async () => {
         await say('new search');
         await say('content type post', 'search');
         await say('summer', 'search');
+        await say('winter in progress', 'search');
 
         expect(mocks.runSearch).toHaveBeenLastCalledWith(
             expect.objectContaining({
-                keywords: ['summer'],
+                keywords: ['winter'],
                 contentTypes: [{ key: 'com.example:post', title: 'Post' }],
+                inProgress: true,
             }),
         );
+    });
+
+    it('should start over on "new search" even while a search is open', async () => {
+        await say('new search');
+        await say('unicorns', 'search');
+
+        expect(await say('new search', 'search')).toEqual({ say: 'juke.reply.search.start', prompt: 'search' });
+        expect($searchFlow.get()?.keywords).toEqual([]);
+
+        await say('content type post', 'search');
+        expect(await say('new search', 'showResults')).toEqual({ say: 'juke.reply.search.start', prompt: 'search' });
     });
 
     it('should apply the criteria to the filter panel on yes and dismiss otherwise', async () => {

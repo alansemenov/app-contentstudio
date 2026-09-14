@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { isEchoOf } from './echo';
+import { isEchoOf, stripEchoPrefix } from './echo';
 
 const spoken = 'I found 3 content items matching your criteria. Do you want to see them?';
+
+describe('stripEchoPrefix', () => {
+    it("should drop Juke's trailing words merged in front of the answer", () => {
+        expect(stripEchoPrefix('do you want to see them yes', spoken)).toBe('yes');
+        expect(stripEchoPrefix('see them yes please', spoken)).toBe('yes please');
+        expect(stripEchoPrefix('want to see them go to superhero', spoken)).toBe('go to superhero');
+    });
+
+    it('should leave answers without echo untouched and empty out pure echo', () => {
+        expect(stripEchoPrefix('yes', spoken)).toBe('yes');
+        expect(stripEchoPrefix('do you want to see them', spoken)).toBe('');
+        expect(stripEchoPrefix('yes', null)).toBe('yes');
+    });
+});
 
 describe('isEchoOf', () => {
     it('should flag Juke hearing its own sentence, whole or in part', () => {

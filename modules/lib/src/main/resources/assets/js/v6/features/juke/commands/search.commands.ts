@@ -25,8 +25,9 @@ import { applySearchToFilterPanel, runSearch, type ModifierCandidate } from './s
 //   Juke: "I found 3 content items matching your criteria. Do you want to see them?"   (prompt: showResults)
 //   User: "Yes"                                -> filter panel opened and filled in
 //
-// Criteria accumulate across utterances while the search prompt is open. A
-// search with no hits keeps the prompt open so the user can refine it.
+// Filter criteria accumulate across utterances while the search prompt is open;
+// keywords are replaced by each utterance. A search with no hits keeps the prompt
+// open so the user can refine it, and "new search" restarts at any point.
 //
 
 export type ParsedCriteria = {
@@ -122,9 +123,11 @@ function currentUser(): ModifierCandidate | null {
 type Resolution = { criteria: SearchCriteria } | { reply: JukeReply };
 
 async function resolveCriteria(base: SearchCriteria, parsed: ParsedCriteria): Promise<Resolution> {
+    // Filters accumulate across utterances; free text is replaced by the latest
+    // utterance's keywords, so a misheard phrase does not poison the search.
     const criteria: SearchCriteria = {
         ...base,
-        keywords: [...base.keywords, ...parsed.keywords],
+        keywords: parsed.keywords.length > 0 ? parsed.keywords : base.keywords,
         contentTypes: [...base.contentTypes],
         modifiers: [...base.modifiers],
         lastModified: parsed.lastModified ?? base.lastModified,
@@ -168,10 +171,12 @@ async function resolveCriteria(base: SearchCriteria, parsed: ParsedCriteria): Pr
     return { criteria };
 }
 
+// Also accepted while a search is open so "new search" always starts afresh
+// instead of being taken for keywords.
 export const searchStartCommand: JukeCommand<true> = {
     id: 'search.start',
     modes: ['dialog'],
-    prompts: [null],
+    prompts: [null, 'search', 'showResults'],
     match: (text) => (START_PATTERN.test(text) ? true : null),
     run: () => {
         resetContentFilter();

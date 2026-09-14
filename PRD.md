@@ -193,7 +193,8 @@ Behaviour:
 - Replies are spoken one at a time through a queue. Recognition keeps running while Juke speaks (pausing it lost
   quick answers in the recognizer's restart gap); transcripts finalized while speaking or within 250 ms after,
   and transcripts whose words are at least 60 % contained in the last reply (`speech/echo.ts`), are dropped as
-  Juke's own echo. A command that throws or takes longer than 20 s
+  Juke's own echo. When no pause separates the reply and the answer, Chrome merges them into one transcript;
+  the leading run of words Juke just said is stripped and the remainder is the answer. A command that throws or takes longer than 20 s
   gets `juke.reply.failed` spoken and logged, so Juke never falls silent. Every recognized phrase and the
   resolved command id are logged with `console.info('[juke] heard', ...)` for diagnosis.
 - Voice: "Google UK English Male", falling back to the first `en-GB` voice, then the first `en` voice. Rate and
@@ -302,8 +303,10 @@ Search acceptance:
   (`commands/search-query.ts`: keywords as text, `AggregationSelection`s for content types, modifier, a
   `DateRangeBucket` for last modified, `in_progress` workflow bucket) and runs the panel's own
   `ContentAggregationsFetcher.getAggregations()`; the total is the hit count. "Found" enters `showResults`;
-  zero hits keeps the `search` prompt open so the criteria can be refined (criteria accumulate across
-  utterances). Content type names resolve against `schema/content/all` titles; "me" resolves to
+  zero hits keeps the `search` prompt open so the criteria can be refined. Filter criteria accumulate across
+  utterances; free-text keywords are replaced by each utterance so a misheard phrase does not stick. "New
+  search" is accepted inside the `search` and `showResults` prompts too and always starts afresh (bug found
+  2026-09-14: it used to become keywords, leaving the user stuck with zero hits). Content type names resolve against `schema/content/all` titles; "me" resolves to
   `config.user`; other user names resolve against the modifier buckets of the current search, mapped to display
   names through `getPrincipalsByKeys`. Unknown type or user: matching reply, prompt stays.
 - "Yes" to `showResults` opens the filter panel, writes value and selection into `$contentFilterState`, so the

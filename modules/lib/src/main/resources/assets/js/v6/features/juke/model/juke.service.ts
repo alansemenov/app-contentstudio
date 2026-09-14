@@ -4,7 +4,7 @@ import { registerCommands, resolveCommand } from '../commands/command.registry';
 import type { JukeReply } from '../commands/command.types';
 import { allCommands } from '../commands/all.commands';
 import { stripJukeAddress } from '../commands/session.commands';
-import { isEchoOf } from '../speech/echo';
+import { isEchoOf, stripEchoPrefix } from '../speech/echo';
 import { normalizeTranscript } from '../speech/normalize';
 import {
     createRecognizer as defaultCreateRecognizer,
@@ -101,20 +101,26 @@ const respond = async (reply: JukeReply): Promise<void> => {
     }
 };
 
-const isSelfEcho = (normalized: readonly string[]): boolean => {
+// Returns the alternatives with Juke's own words removed, or null when nothing
+// but echo was heard.
+const withoutSelfEcho = (normalized: readonly string[]): string[] | null => {
     if (speaking || Date.now() - speechEndedAt < ECHO_GRACE_MS) {
-        return true;
+        return null;
     }
-    return normalized.every((text) => isEchoOf(text, lastSpoken));
+    const remaining = normalized
+        .map((text) => stripEchoPrefix(text, lastSpoken))
+        .filter((text) => text.length > 0 && !isEchoOf(text, lastSpoken));
+    return remaining.length > 0 ? remaining : null;
 };
 
 const handleTranscripts = (alternatives: string[]): void => {
-    const normalized = alternatives.map(normalizeTranscript).filter((text) => text.length > 0);
-    if (normalized.length === 0) {
+    const heard = alternatives.map(normalizeTranscript).filter((text) => text.length > 0);
+    if (heard.length === 0) {
         return;
     }
-    if (isSelfEcho(normalized)) {
-        console.info('[juke] ignored own speech', JSON.stringify(normalized[0]));
+    const normalized = withoutSelfEcho(heard);
+    if (normalized == null) {
+        console.info('[juke] ignored own speech', JSON.stringify(heard[0]));
         return;
     }
     setJukeTranscript(normalized[0]);
