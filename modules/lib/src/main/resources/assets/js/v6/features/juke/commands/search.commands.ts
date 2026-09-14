@@ -2,6 +2,7 @@ import { i18n } from '@enonic/lib-admin-ui/util/Messages';
 import { fetchAllContentTypes } from '../../../entities/schema/api/contentTypes.api';
 import { $config } from '../../../shared/config/config.store';
 import { resetContentFilter } from '../../../shared/app-state/contentFilter.store';
+import { resetActionFlow } from '../model/actionFlow.store';
 import { resetCreateFlow } from '../model/createFlow.store';
 import {
     $searchFlow,
@@ -211,6 +212,7 @@ export const searchStartCommand: JukeCommand<true> = {
     run: () => {
         resetContentFilter();
         resetCreateFlow();
+        resetActionFlow();
         startSearchFlow();
         return { say: i18n('juke.reply.search.start'), prompt: 'search' };
     },

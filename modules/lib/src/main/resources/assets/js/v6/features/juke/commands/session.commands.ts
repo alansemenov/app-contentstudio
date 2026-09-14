@@ -1,4 +1,5 @@
 import { i18n } from '@enonic/lib-admin-ui/util/Messages';
+import { resetActionFlow } from '../model/actionFlow.store';
 import { resetCreateFlow } from '../model/createFlow.store';
 import { resetSearchFlow } from '../model/searchFlow.store';
 import { setJukeMode, setJukePrompt } from '../model/juke.store';
@@ -42,6 +43,7 @@ export const helloCommand: JukeCommand<true> = {
         // Show the icon before speaking so the greeting animates the widget.
         resetCreateFlow();
         resetSearchFlow();
+        resetActionFlow();
         setJukePrompt(null);
         setJukeMode('dialog');
         return { say: i18n('juke.reply.hello', context.userName) };
@@ -55,6 +57,7 @@ export const goodbyeCommand: JukeCommand<true> = {
     run: (_args, context) => {
         resetCreateFlow();
         resetSearchFlow();
+        resetActionFlow();
         return {
             say: i18n('juke.reply.goodbye', context.userName),
             mode: 'idle',
@@ -72,6 +75,7 @@ export const cancelCommand: JukeCommand<true> = {
     run: () => {
         resetCreateFlow();
         resetSearchFlow();
+        resetActionFlow();
         return { say: i18n('juke.reply.cancel'), prompt: null };
     },
 };

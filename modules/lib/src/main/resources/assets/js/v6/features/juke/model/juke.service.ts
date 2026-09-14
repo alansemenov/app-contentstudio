@@ -12,6 +12,7 @@ import {
     type RecognizerHandlers,
 } from '../speech/recognizer';
 import { createSpeaker as defaultCreateSpeaker, type Speaker } from '../speech/speaker';
+import { resetActionFlow } from './actionFlow.store';
 import { resetCreateFlow } from './createFlow.store';
 import { resetSearchFlow } from './searchFlow.store';
 import {
@@ -183,6 +184,7 @@ const deactivate = (): void => {
     resetJukeState();
     resetCreateFlow();
     resetSearchFlow();
+    resetActionFlow();
     speaking = false;
     speechEndedAt = 0;
     recentSpoken = [];

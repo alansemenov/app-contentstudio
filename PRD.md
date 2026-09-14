@@ -145,10 +145,10 @@ phrase, so nothing falls through to the unknown reply while a question is open.
 | Displayed list order | `$activeFlatNodes` in `entities/content/model/active-tree.store.ts` (`node.id`, `node.data.displayName`) |
 | Implicit target | `getCurrentItems()` in `entities/content/model/content-selection.store.ts` (selected items, else the highlighted row) |
 | Tree expand/collapse | `expandNode`, `collapseNode`, `isNodeExpanded`, `getTreeNode`, `hasTreeNode` in `entities/content/model/content-tree.store.ts`; `expandFilterNode` in `filter-tree.store.ts` |
-| Delete | `openDeleteDialog(items)` then `executeDeleteDialogAction()` after `$isDeleteDialogReady`, or `archiveContent`/`deleteContent` in `features/delete/api/delete.api.ts` |
-| Move | `moveContent(contentIds, parentPath)` in `features/move/api/move.api.ts`; parent lookup via `queryContent` free-text search |
-| Duplicate | `duplicateContent(params)` in `features/duplicate/api/duplicate.api.ts` with `includeChildren` |
-| Preview | `PreviewActionHelper.openWindows(contents, $activeWidget.get())` (`app/action/PreviewActionHelper.ts`), skip items where `getUrl` is empty / not previewable |
+| Delete | `archiveContent` in `entities/content/api/delete.api.ts` (moved from `features/delete/api`, shim left) |
+| Move | `moveContent(contentIds, parentPath?)` in `entities/content/api/move.api.ts` (moved from `features/move/api`, shim left); parent lookup via `findContentByName` |
+| Duplicate | `duplicateContent(params)` in `entities/content/api/duplicate.api.ts` (moved from `features/duplicate/api`, shim left) with `includeChildren` |
+| Preview | `PreviewActionHelper.openWindows(contents)` (`app/action/PreviewActionHelper.ts`) with the default portal preview; previewable = has page, is site, or is media |
 | Widget mount | `pages/browse/BrowseAppShell.tsx` next to the app-level dialogs |
 | Notifications | `showWarning` from `@enonic/lib-admin-ui/notify/MessageBus` |
 
@@ -338,7 +338,7 @@ Tree acceptance:
   reply. Pure client-side: Juke only changes the tree store's expanded state and issues no REST calls; if the
   tree itself lazy-loads children on expand, that is the tree's own behaviour, not Juke's.
 
-### Milestone 4 — Toolbar actions on a spoken target
+### Milestone 4 — Toolbar actions on a spoken target (done)
 
 Commands name their target instead of relying on a prior selection (decided 2026-09-13).
 
@@ -362,10 +362,11 @@ Phrases:
 - `juke.reply.edit.opening=Opening {0} for editing.` / `juke.reply.edit.openingMany=Opening {0} items for editing.`
 - `juke.reply.delete.confirmOne=Are you sure you want to delete {0}?`
 - `juke.reply.delete.confirmMany=Are you sure you want to delete {0} items?`
-- `juke.reply.delete.done=Selected content is deleted.`
+- `juke.reply.delete.done={0} is deleted.`
 - `juke.reply.delete.cancelled=Okay. Nothing was deleted.`
 - `juke.reply.move.where=Where do you want to move {0}?`
-- `juke.reply.move.done={0} is moved under {1}.`
+- `juke.reply.move.done={0} is moved under {1}.` / `juke.reply.move.doneRoot={0} is moved to the root.`
+- `juke.reply.move.notAll=I can only move one item or the selected items. Tell me which one.`
 - `juke.reply.move.targetNotFound=I can't find {0} in the current project. Try again.`
 - `juke.reply.move.targetAmbiguous=I found several items named {0}. Try again with a more specific name.`
 - `juke.reply.move.cancelled=Okay. Nothing was moved.`
@@ -373,23 +374,32 @@ Phrases:
 - `juke.reply.duplicate.doneWith={0} is duplicated with all the children.`
 - `juke.reply.duplicate.doneWithout={0} is duplicated without the children.`
 - `juke.reply.duplicate.cancelled=Okay. Nothing was duplicated.`
-- `juke.reply.preview.opening=Opening a preview of {0}.` / `juke.reply.preview.none={0} cannot be previewed.`
+- `juke.reply.preview.opening=Opening a preview of {0}.` / `juke.reply.preview.openingMany=Opening previews of {0} items.` / `juke.reply.preview.none={0} cannot be previewed.`
+- `juke.reply.action.failed=Something went wrong while doing that. Please try again.`
 - `{0}` is the item's display name, or "<X> items" for several.
 
 Acceptance:
-- Target resolution (`commands/target.ts`) is shared by all five actions and unit-tested on its own.
+- Target resolution (`commands/target.ts`) is shared by all five actions and unit-tested on its own. Verbs:
+  edit; delete/remove/archive; move/relocate; duplicate/copy/clone; preview. Specs from every recognition
+  alternative are tried in order. State between question and answer lives in `model/actionFlow.store.ts`.
+- The delete, move and duplicate REST wrappers moved from `features/*/api` to `entities/content/api` (re-export
+  shims left in place) so `features/juke` can call them within the boundary rules. Each returns a task id; Juke
+  waits for the task with `trackTask` and answers done or `action.failed`.
 - Edit: one edit tab per resolved item via `ContentUrlHelper.openEditContentTab`; reply names the item or the
   count.
-- Delete: confirmation prompt with display name or count → `confirmDelete`. "Yes" deletes through the delete
-  feature API (archive) and speaks done; "no"/"cancel" speaks cancelled and does nothing. The prompt holds the
+- Delete: confirmation prompt with display name or count → `confirmDelete`. Only an explicit "yes" (also "go
+  ahead", "confirm") archives and speaks done; any other answer speaks cancelled and does nothing. The prompt holds the
   resolved items, not the selection.
 - Move: "Where do you want to move <name>?" → `moveTarget`. The answer is a new-parent name resolved with
-  `findContentByName` + `canHoldChildren`, excluding the moved items and their descendants; a unique match moves
-  the items with `moveContent` and speaks done; not found / ambiguous keep the prompt; "cancel" cancels.
+  `findContentByName` + `canHoldChildren`, excluding the moved items and their descendants ("to the root" moves
+  to the root); a unique match moves the items with `moveContent`, then expands the destination in the tree
+  (`revealContentByPath` with `select: false, expandTarget: true`) and speaks done; not found / ambiguous keep
+  the prompt; "cancel" cancels. "Move all" is refused.
 - Duplicate: children question → `duplicateChildren`. "Yes"/"no" duplicates with or without children via
   `duplicateContent` and speaks the matching reply; "cancel" cancels.
-- Preview: one tab per previewable resolved item via `PreviewActionHelper.openWindows`, skipping items that
-  cannot be previewed; if none can, the none reply.
+- Preview: one tab per previewable resolved item (has a page, is a site, or is media) via
+  `PreviewActionHelper.openWindows` with the default portal preview (the active preview widget lives in the
+  widgets layer, out of reach for a feature); non-previewable items are skipped; if none can, the none reply.
 - "Cancel" and "let's try again" work in every prompt as in the create dialog.
 - Toolbar actions do not change the selection; the mouse selection stays whatever it was.
 

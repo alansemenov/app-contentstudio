@@ -4,6 +4,7 @@ import { projectCommands } from './project.commands';
 import { searchCommands } from './search.commands';
 import { sessionCommands } from './session.commands';
 import { smallTalkCommands } from './smalltalk.commands';
+import { toolbarCommands } from './toolbar.commands';
 import { treeCommands } from './tree.commands';
 
 //
@@ -19,6 +20,7 @@ export const allCommands: readonly JukeCommand[] = [
     ...smallTalkCommands,
     ...searchCommands,
     ...treeCommands,
+    ...toolbarCommands,
     ...projectCommands,
     ...contentCommands,
 ];

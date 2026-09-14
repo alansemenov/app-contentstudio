@@ -21,6 +21,10 @@ export type RevealContentByPathOptions = {
     // Invoked immediately before setActive fires, so the caller can suppress the
     // redundant preview reload triggered by the resulting selection change.
     onBeforeSelect?: (id: string) => void;
+    // Skip selecting and scrolling to the target; only expand the path to it.
+    select?: boolean;
+    // Also expand the target itself, loading its children when needed.
+    expandTarget?: boolean;
 };
 
 // Ensures the content data is cached before selecting, so the selection→preview
@@ -51,7 +55,7 @@ async function resolveId(pathStr: string, projectName?: string): Promise<string 
 }
 
 export async function revealContentByPath(pathStr: string, options: RevealContentByPathOptions = {}): Promise<void> {
-    const { projectName, onBeforeSelect } = options;
+    const { projectName, onBeforeSelect, select = true, expandTarget = false } = options;
 
     let targetPath: ContentPath;
     try {
@@ -90,8 +94,16 @@ export async function revealContentByPath(pathStr: string, options: RevealConten
             expandNode(id);
         } else {
             if (!hasTreeNode(id)) return; // ancestor chain broke; nothing to reveal
-            await selectContent(id, onBeforeSelect);
-            requestRevealScroll(id);
+            if (select) {
+                await selectContent(id, onBeforeSelect);
+                requestRevealScroll(id);
+            }
+            if (expandTarget) {
+                if (nodeNeedsChildrenLoad(id)) {
+                    await fetchChildrenIdsOnly(id).catch(() => undefined);
+                }
+                expandNode(id);
+            }
         }
     }
 }
