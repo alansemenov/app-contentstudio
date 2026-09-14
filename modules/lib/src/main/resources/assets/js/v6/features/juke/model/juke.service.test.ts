@@ -264,7 +264,7 @@ describe('juke.service', () => {
         await hear('hello juke');
         await finishSpeaking();
 
-        await hear('what can i help you with today how are you');
+        await hear('help you with today how are you');
 
         expect(speeches[0].text).toBe('juke.reply.smalltalk.howAreYou|Alan');
     });
