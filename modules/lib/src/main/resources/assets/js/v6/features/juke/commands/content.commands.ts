@@ -44,7 +44,8 @@ export type CreateStartArgs = { typeName: string };
 export type CreateParentArgs = { kind: 'root' } | { kind: 'restart' } | { kind: 'named'; name: string };
 export type CreateNameArgs = { kind: 'restart' } | { kind: 'named'; name: string };
 
-const CREATE_PATTERN = /^(?:create|make|add|new)\s+(?:(?:a|an)\s+)?(?:new\s+)?(.+)$/;
+// "create" is often heard as "great" or "crate".
+const CREATE_PATTERN = /^(?:create|great|crate|created|make|add|new)\s+(?:(?:a|an)\s+)?(?:new\s+)?(.+)$/;
 const RESTART_PATTERN = /^(?:lets|let us)?\s*(?:try again|start over|start again|restart)$/;
 const ROOT_PATTERN = /^(?:(?:in|at|under|inside|to)\s+)?(?:the\s+)?(?:project\s+)?root(?:\s+(?:folder|level))?$/;
 const PARENT_PREFIX = /^(?:under|in|inside|below|into)\s+(?:the\s+)?/;
