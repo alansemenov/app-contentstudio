@@ -44,9 +44,10 @@ export type SearchAnswer = { kind: 'restart' } | { kind: 'criteria'; parsed: Par
 export type ShowAnswer = { kind: 'yes' } | { kind: 'no' };
 
 // "new search", "start a new search", "let's do a new search", "search again", "another search",
-// "reset the search", plus "surge", which is how recognition often hears "search".
+// "reset the search", plus what recognition makes of it: "surge" for "search", "you"/"use"/"knew"/"and you"
+// for "new", and "usage" for the whole phrase.
 const START_PATTERN =
-    /^(?:(?:lets|let us|please)\s+)?(?:(?:do|start|make|begin|run)\s+)?(?:a\s+|another\s+)?(?:new\s+)?(?:search|surge)(?:\s+again)?$|^(?:reset|restart|clear)\s+(?:the\s+)?search$/;
+    /^(?:(?:lets|let us|please)\s+)?(?:(?:do|start|make|begin|run)\s+)?(?:a\s+|another\s+|and\s+)?(?:(?:new|you|use|knew|nu)\s+)?(?:search|surge)(?:\s+again)?$|^(?:reset|restart|clear)\s+(?:the\s+)?search$|^usage$/;
 const RESTART_PATTERN = /^(?:lets|let us)?\s*(?:try again|start over|start again|restart)$/;
 const YES_PATTERN = /^(?:yes|yeah|yep|sure|please|ok|okay|show me|show them|yes please|show)$/;
 
