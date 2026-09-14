@@ -1,4 +1,5 @@
 import type { TaskId } from '@enonic/lib-admin-ui/task/TaskId';
+import { showError, showSuccess } from '@enonic/lib-admin-ui/notify/MessageBus';
 import { i18n } from '@enonic/lib-admin-ui/util/Messages';
 import type { ResultAsync } from 'neverthrow';
 import { PreviewActionHelper } from '../../../../app/action/PreviewActionHelper';
@@ -83,16 +84,26 @@ function targetSpecs(args: ToolbarArgs, context: JukeContext): TargetSpec[] {
     });
 }
 
-// Resolves a task-returning request and waits for the task to finish.
-async function runTask(request: ResultAsync<TaskId, AppError>): Promise<boolean> {
+type TaskOutcome = { ok: boolean; message: string };
+
+// Resolves a task-returning request and waits for the task to finish. Failures
+// are shown as Content Studio's usual error notification.
+async function runTask(request: ResultAsync<TaskId, AppError>, actionLabel: string): Promise<TaskOutcome> {
     const result = await request;
     if (result.isErr()) {
         console.error('[juke] action request failed', result.error);
-        return false;
+        showError(result.error.message || i18n('notify.process.failed', actionLabel));
+        return { ok: false, message: result.error.message };
     }
-    return new Promise<boolean>((resolve) => {
+    return new Promise<TaskOutcome>((resolve) => {
         trackTask(result.value, {
-            onComplete: (state) => resolve(state !== 'ERROR'),
+            onComplete: (state, message) => {
+                const ok = state !== 'ERROR';
+                if (!ok) {
+                    showError(message || i18n('notify.process.failed', actionLabel));
+                }
+                resolve({ ok, message });
+            },
         });
     });
 }
@@ -189,8 +200,21 @@ export const confirmDeleteCommand: JukeCommand<YesNoArgs> = {
         if (answer.kind !== 'yes') {
             return finished(i18n('juke.reply.delete.cancelled'));
         }
-        const ok = await runTask(archiveContent(flow.items.map((item) => item.getContentId())));
-        return finished(ok ? i18n('juke.reply.delete.done', flow.label) : i18n('juke.reply.action.failed'));
+        const { ok } = await runTask(
+            archiveContent(flow.items.map((item) => item.getContentId())),
+            i18n('action.delete'),
+        );
+        if (!ok) {
+            return finished(i18n('juke.reply.action.failed'));
+        }
+        // Same toast the Delete dialog shows.
+        const total = flow.items.length;
+        showSuccess(
+            total > 1
+                ? i18n('dialog.archive.success.multiple', total)
+                : i18n('dialog.archive.success.single', flow.items[0].getDisplayName()),
+        );
+        return finished(i18n('juke.reply.delete.done', flow.label));
     },
 };
 
@@ -239,15 +263,22 @@ export const moveTargetCommand: JukeCommand<MoveTargetArgs> = {
             }
         }
 
-        const ok = await runTask(
+        const { ok } = await runTask(
             moveContent(
                 flow.items.map((item) => item.getContentId()),
                 destination?.getPath(),
             ),
+            i18n('action.move'),
         );
         if (!ok) {
             return finished(i18n('juke.reply.action.failed'));
         }
+        // Same toast the Move dialog shows.
+        const total = flow.items.length;
+        const destinationLabel = destination?.getPath().toString() || i18n('field.root');
+        showSuccess(
+            `${i18n(total > 1 ? 'notify.items.moved.to.multi' : 'notify.items.moved.to.single', total)} ${destinationLabel}`,
+        );
         if (destination != null) {
             // Shows the moved items in their new place without changing the selection.
             await leaveFilterMode();
@@ -278,12 +309,20 @@ export const duplicateChildrenCommand: JukeCommand<YesNoArgs> = {
         // Duplicates appear next to their originals in the tree, so leave the
         // filtered list first and expand the originals' parent afterwards.
         await leaveFilterMode();
-        const ok = await runTask(
+        const { ok } = await runTask(
             duplicateContent(flow.items.map((item) => ({ contentId: item.getContentId(), includeChildren }))),
+            i18n('action.duplicate'),
         );
         if (!ok) {
             return finished(i18n('juke.reply.action.failed'));
         }
+        // Same toast the Duplicate dialog shows.
+        const total = flow.items.length;
+        showSuccess(
+            total > 1
+                ? i18n('dialog.duplicate.success.multiple', total)
+                : i18n('dialog.duplicate.success.single', flow.items[0].getDisplayName()),
+        );
         await expandInTree(flow.items[0].getPath().getParentPath());
         return finished(
             includeChildren

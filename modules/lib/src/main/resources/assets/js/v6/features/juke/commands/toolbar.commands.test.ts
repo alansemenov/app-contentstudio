@@ -19,7 +19,14 @@ const { mocks } = vi.hoisted(() => ({
         findContentByName: vi.fn(),
         leaveFilterMode: vi.fn(),
         expandInTree: vi.fn(),
+        showSuccess: vi.fn(),
+        showError: vi.fn(),
     },
+}));
+
+vi.mock('@enonic/lib-admin-ui/notify/MessageBus', () => ({
+    showSuccess: mocks.showSuccess,
+    showError: mocks.showError,
 }));
 
 vi.mock('@enonic/lib-admin-ui/util/Messages', () => ({
@@ -198,6 +205,7 @@ describe('toolbar actions', () => {
 
         expect(await say('yes', 'confirmDelete')).toEqual({ say: 'juke.reply.delete.done|Summer news', prompt: null });
         expect(mocks.archiveContent).toHaveBeenCalledWith([post.getContentId()]);
+        expect(mocks.showSuccess).toHaveBeenCalledWith('dialog.archive.success.single|Summer news');
         expect($actionFlow.get()).toBeNull();
     });
 
@@ -218,10 +226,13 @@ describe('toolbar actions', () => {
             return () => undefined;
         });
         expect(await say('yes', 'confirmDelete')).toEqual({ say: 'juke.reply.action.failed', prompt: null });
+        expect(mocks.showError).toHaveBeenCalledTimes(1);
 
         await say('delete summer news');
         mocks.archiveContent.mockReturnValue(errAsync(new Error('boom')));
         expect(await say('yes', 'confirmDelete')).toEqual({ say: 'juke.reply.action.failed', prompt: null });
+        expect(mocks.showError).toHaveBeenLastCalledWith('boom');
+        expect(mocks.showSuccess).not.toHaveBeenCalled();
     });
 
     it('should ask where to move, resolve the destination and move', async () => {
@@ -238,6 +249,7 @@ describe('toolbar actions', () => {
         expect(mocks.moveContent).toHaveBeenCalledWith([post.getContentId()], blogs.getPath());
         expect(mocks.leaveFilterMode).toHaveBeenCalledTimes(1);
         expect(mocks.expandInTree).toHaveBeenCalledWith(blogs.getPath());
+        expect(mocks.showSuccess).toHaveBeenCalledWith('notify.items.moved.to.single|1 /superhero/blogs');
     });
 
     it('should exclude the moved items and their descendants as destinations', async () => {
@@ -259,6 +271,7 @@ describe('toolbar actions', () => {
             prompt: null,
         });
         expect(mocks.moveContent).toHaveBeenCalledWith([post.getContentId()], undefined);
+        expect(mocks.showSuccess).toHaveBeenCalledWith('notify.items.moved.to.single|1 field.root');
 
         await say('move summer news');
         mocks.findContentByName.mockResolvedValue({ kind: 'none' });
