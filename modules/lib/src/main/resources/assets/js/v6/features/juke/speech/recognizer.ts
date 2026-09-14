@@ -105,6 +105,7 @@ export function createRecognizer(handlers: RecognizerHandlers, options: Recogniz
     };
 
     const handleError = (event: { error: string }): void => {
+        console.info('[juke] recognition error', event.error);
         if (DENIED_ERRORS.has(event.error)) {
             active = false;
             clearRestart();
@@ -119,6 +120,7 @@ export function createRecognizer(handlers: RecognizerHandlers, options: Recogniz
 
     const handleEnd = (): void => {
         instance = null;
+        console.info('[juke] recognition ended', active && !paused ? `restarting in ${backoff} ms` : 'stopped');
         if (active && !paused) {
             scheduleRestart(backoff);
         }
@@ -139,6 +141,7 @@ export function createRecognizer(handlers: RecognizerHandlers, options: Recogniz
             recognition.onend = handleEnd;
             instance = recognition;
             recognition.start();
+            console.info('[juke] recognition started');
         } catch (error) {
             console.error('[juke] speech recognition failed to start', error);
             instance = null;

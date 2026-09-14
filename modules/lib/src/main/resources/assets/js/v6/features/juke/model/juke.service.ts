@@ -52,7 +52,9 @@ let queue: Promise<void> = Promise.resolve();
 // Recognition keeps running while Juke speaks so a quick answer is not lost in
 // the recognizer's restart gap. Transcripts finalized during speech, shortly
 // after it, or echoing what was just said are dropped instead.
-export const ECHO_GRACE_MS = 250;
+// Chrome finalizes the echo of a reply up to about a second after the voice
+// stops; a user answer is finalized later than that.
+export const ECHO_GRACE_MS = 1000;
 let speaking = false;
 let speechEndedAt = 0;
 // The last few replies; see isEchoOf for why more than one is kept.
@@ -88,11 +90,13 @@ const respond = async (reply: JukeReply): Promise<void> => {
     setJukeActivity('speaking');
     speaking = true;
     recentSpoken = [reply.say, ...recentSpoken].slice(0, RECENT_SPOKEN_SIZE);
+    console.info('[juke] speaking', JSON.stringify(reply.say));
     try {
         await speaker?.speak(reply.say);
     } finally {
         speaking = false;
         speechEndedAt = Date.now();
+        console.info('[juke] finished speaking');
         setJukeActivity('listening');
         if (reply.prompt !== undefined) {
             setJukePrompt(reply.prompt);
@@ -122,7 +126,11 @@ const handleTranscripts = (alternatives: string[]): void => {
     }
     const normalized = withoutSelfEcho(heard);
     if (normalized == null) {
-        console.info('[juke] ignored own speech', JSON.stringify(heard[0]));
+        console.info(
+            '[juke] ignored own speech',
+            JSON.stringify(heard[0]),
+            speaking ? 'while speaking' : `${Date.now() - speechEndedAt} ms after speaking`,
+        );
         return;
     }
     setJukeTranscript(normalized[0]);
