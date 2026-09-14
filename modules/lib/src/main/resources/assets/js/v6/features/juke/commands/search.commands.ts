@@ -37,11 +37,10 @@ export type ParsedCriteria = {
     inProgress: boolean;
 };
 
-export type SearchAnswer = { kind: 'cancel' } | { kind: 'restart' } | { kind: 'criteria'; parsed: ParsedCriteria };
+export type SearchAnswer = { kind: 'restart' } | { kind: 'criteria'; parsed: ParsedCriteria };
 export type ShowAnswer = { kind: 'yes' } | { kind: 'no' };
 
 const START_PATTERN = /^(?:(?:start\s+)?(?:a\s+)?new\s+search|start\s+(?:a\s+)?search|search)$/;
-const CANCEL_PATTERN = /^(?:cancel|never mind|nevermind|stop|forget it)$/;
 const RESTART_PATTERN = /^(?:lets|let us)?\s*(?:try again|start over|start again|restart)$/;
 const YES_PATTERN = /^(?:yes|yeah|yep|sure|please|ok|okay|show me|show them|yes please|show)$/;
 
@@ -99,7 +98,6 @@ export function parseCriteria(text: string): ParsedCriteria {
 }
 
 export function parseSearchAnswer(text: string): SearchAnswer {
-    if (CANCEL_PATTERN.test(text)) return { kind: 'cancel' };
     if (RESTART_PATTERN.test(text)) return { kind: 'restart' };
     return { kind: 'criteria', parsed: parseCriteria(text) };
 }
@@ -170,11 +168,6 @@ async function resolveCriteria(base: SearchCriteria, parsed: ParsedCriteria): Pr
     return { criteria };
 }
 
-const cancelled = (): JukeReply => {
-    resetSearchFlow();
-    return { say: i18n('juke.reply.search.cancelled'), prompt: null };
-};
-
 export const searchStartCommand: JukeCommand<true> = {
     id: 'search.start',
     modes: ['dialog'],
@@ -193,9 +186,6 @@ export const searchCriteriaCommand: JukeCommand<SearchAnswer> = {
     prompts: ['search'],
     match: (text) => parseSearchAnswer(text),
     run: async (answer) => {
-        if (answer.kind === 'cancel') {
-            return cancelled();
-        }
         if (answer.kind === 'restart') {
             resetContentFilter();
             startSearchFlow();

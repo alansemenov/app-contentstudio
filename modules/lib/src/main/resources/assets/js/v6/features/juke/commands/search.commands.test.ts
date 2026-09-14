@@ -100,8 +100,7 @@ describe('parseCriteria', () => {
 });
 
 describe('answer parsers', () => {
-    it('should recognize cancel, restart and criteria', () => {
-        expect(parseSearchAnswer('cancel')).toEqual({ kind: 'cancel' });
+    it('should recognize restart and criteria', () => {
         expect(parseSearchAnswer('lets try again')).toEqual({ kind: 'restart' });
         expect(parseSearchAnswer('in progress').kind).toBe('criteria');
     });
@@ -217,9 +216,9 @@ describe('search dialog', () => {
         expect(mocks.applySearchToFilterPanel).toHaveBeenCalledTimes(1);
     });
 
-    it('should cancel and restart', async () => {
+    it('should cancel through the session command and restart', async () => {
         await say('new search');
-        expect(await say('cancel', 'search')).toEqual({ say: 'juke.reply.search.cancelled', prompt: null });
+        expect(await say('cancel', 'search')).toEqual({ say: 'juke.reply.cancel', prompt: null });
         expect($searchFlow.get()).toBeNull();
 
         await say('new search');

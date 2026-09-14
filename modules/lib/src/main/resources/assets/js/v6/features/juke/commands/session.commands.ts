@@ -15,6 +15,7 @@ export const JUKE_NAME_PATTERN = '(?:juke|jukes|duke|jook|jude|jules|juno)';
 
 const WAKE_PATTERN = new RegExp(`\\b(?:hello|hey|hi)\\s+${JUKE_NAME_PATTERN}\\b`);
 const SLEEP_PATTERN = new RegExp(`\\b(?:goodbye|good bye|bye|bye bye|see you)\\s+${JUKE_NAME_PATTERN}\\b`);
+const CANCEL_PATTERN = /^(?:cancel|never mind|nevermind|forget it|stop)$/;
 
 export function isWakePhrase(text: string): boolean {
     return WAKE_PATTERN.test(text);
@@ -62,4 +63,17 @@ export const goodbyeCommand: JukeCommand<true> = {
     },
 };
 
-export const sessionCommands: readonly JukeCommand[] = [helloCommand, goodbyeCommand];
+// "Cancel" abandons whatever question Juke is waiting on and returns to plain
+// dialog mode. Registered with the session commands so it wins in every prompt.
+export const cancelCommand: JukeCommand<true> = {
+    id: 'session.cancel',
+    modes: ['dialog'],
+    match: (text) => (CANCEL_PATTERN.test(text) ? true : null),
+    run: () => {
+        resetCreateFlow();
+        resetSearchFlow();
+        return { say: i18n('juke.reply.cancel'), prompt: null };
+    },
+};
+
+export const sessionCommands: readonly JukeCommand[] = [helloCommand, goodbyeCommand, cancelCommand];

@@ -3,6 +3,7 @@ import { $jukeMode, $jukePrompt, resetJukeState } from '../model/juke.store';
 import { clearCommands, registerCommands, resolveCommand } from './command.registry';
 import type { JukeContext } from './command.types';
 import {
+    cancelCommand,
     goodbyeCommand,
     helloCommand,
     isSleepPhrase,
@@ -99,6 +100,17 @@ describe('session commands', () => {
 
         const reply = await resolved!.command.run(resolved!.args, context('dialog'));
         expect(reply).toEqual({ say: 'juke.reply.goodbye|Alan', mode: 'idle', prompt: null });
+    });
+
+    it('cancel abandons any pending prompt and answers Ok', async () => {
+        const resolved = resolveCommand(['cancel'], context('dialog', 'createName'));
+        expect(resolved?.command).toBe(cancelCommand);
+        expect(await resolved!.command.run(resolved!.args, context('dialog', 'createName'))).toEqual({
+            say: 'juke.reply.cancel',
+            prompt: null,
+        });
+        expect(resolveCommand(['never mind'], context('dialog'))?.command).toBe(cancelCommand);
+        expect(resolveCommand(['cancel'], context('idle'))).toBeNull();
     });
 
     it('session commands win over pending prompts', () => {

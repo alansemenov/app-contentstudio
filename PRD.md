@@ -105,15 +105,17 @@ Within `dialog`, a `PendingPrompt` narrows what the next utterance means:
 
 | Pending prompt | Set by | Accepts |
 |---|---|---|
-| `createParent` | "Create a <type>" | root phrases, cancel, "let's try again", or a parent display name |
-| `createName` | parent accepted | cancel, "let's try again", or any phrase as the new display name |
+| `createParent` | "Create a <type>" | root phrases, "let's try again", or a parent display name |
+| `createName` | parent accepted | "let's try again", or any phrase as the new display name |
 | `search` | "New search" | filter phrases and keywords until a search is performed |
 | `showResults` | search finished with hits | "yes" (apply filter and open panel) or anything else (dismiss) |
 | `confirmDelete` | "Delete <target>" | yes / no / cancel |
 | `moveTarget` | "Move <target>" | cancel or a display-name keyword for the new parent |
 | `duplicateChildren` | "Duplicate <target>" | yes / no / cancel |
 
-Session commands ("goodbye juke", "hello juke") always win over pending prompts. Commands that only make sense
+Session commands ("goodbye juke", "hello juke", "cancel") always win over pending prompts. "Cancel" (also "never
+mind", "forget it", "stop") abandons any open question, clears the create/search state and answers "Ok"; Juke
+stays in dialog mode. Commands that only make sense
 without a pending prompt declare `prompts: [null]`; prompt commands declare their prompt and typically accept any
 phrase, so nothing falls through to the unknown reply while a question is open.
 
@@ -161,6 +163,7 @@ an audible pause.
 - `juke.reply.hello=Hello {0}. What can I help you with today?`
 - `juke.reply.goodbye=Goodbye {0}. See you next time.`
 - `juke.reply.unknown=I'm not sure how to respond to this command. Please try again.`
+- `juke.reply.cancel=Ok` (universal cancel of any pending question)
 - `juke.notify.micDenied=Juke cannot hear you: microphone access is blocked for this site.`
 - `juke.widget.listening` / `juke.widget.speaking` (aria labels of the widget)
 - Small talk (dialog mode only), each with the user's name as `{0}`:
@@ -220,7 +223,6 @@ Phrases:
 - `juke.reply.create.askName=How do you want to call the new {0}?`
 - `juke.reply.create.creating=Creating a new {0} called {1} under {2}`
 - `juke.reply.create.creatingRoot=Creating a new {0} called {1} in the root`
-- `juke.reply.create.cancelled=Okay. Nothing was created.`
 - `juke.reply.create.restart=Okay. Let's start over. What do you want to create?`
 - `juke.reply.create.failed=I could not create a new {0}. Please try again.`
 
@@ -242,15 +244,15 @@ Behaviour:
      against all non-abstract, non-media content types (`schema/content/all`) by title and local name. Not
      found: type-not-found reply, no prompt. Found: "Where do you want to create a new <Type>?" and prompt
      `createParent`.
-  2. In `createParent`: "root", "in the root", "at the root", "project root" → root. "cancel"/"never mind"
-     → cancelled reply, dialog closed. "let's try again"/"try again"/"start over"/"restart" → collected
+  2. In `createParent`: "root", "in the root", "at the root", "project root" → root. "cancel" → handled by the
+     session command ("Ok"). "let's try again"/"try again"/"start over"/"restart" → collected
      state dropped, restart reply, no prompt; the user then says "create a ..." again. Anything else (optionally prefixed "under|in|inside|below|into [the]")
      is a parent display name resolved with `findContentByName` + `canHoldChildren`. Not found or ambiguous:
      the matching reply, prompt stays. Then the allowed types for that parent are fetched
      (`ContentTypesHelper.getAvailableContentTypes` with the parent id, or none for root); if the type is not
      allowed there Juke says so and keeps asking. Otherwise "How do you want to call the new <Type>?" and prompt
      `createName`.
-  3. In `createName`: "cancel" → cancelled; "let's try again" → restart as above. Any other phrase is the name (first letter capitalized). Juke
+  3. In `createName`: "cancel" → session command; "let's try again" → restart as above. Any other phrase is the name (first letter capitalized). Juke
      creates through the legacy `CreateContentRequest` (display name set; path name generated from it with the
      wizard's rules — `NamePrettyfier.prettify`, or simplified for media / when `allowPathTransliteration` is off —
      and suffixed `-1`, `-2`, … via `contentExistsByPath` when the path is taken; workflow in progress),
@@ -278,7 +280,7 @@ Phrases:
 - `juke.reply.search.none=I couldn't find any content items matching your criteria. Try a different search.`
 - `juke.reply.search.found=I found {0} content items matching your criteria. Do you want to see them?`
 - `juke.reply.search.showing=Here they are. {0} items.` / `juke.reply.search.dismissed=Okay.`
-- `juke.reply.search.typeNotFound`, `juke.reply.search.userNotFound`, `juke.reply.search.cancelled`
+- `juke.reply.search.typeNotFound`, `juke.reply.search.userNotFound`
 - `juke.reply.tree.expanding=Expanding {0}`
 - `juke.reply.tree.collapsing=Collapsing {0}`
 - `juke.reply.tree.alreadyExpanded={0} is already expanded`
@@ -304,7 +306,7 @@ Search acceptance:
   list applies the same filter. Hit count in the panel equals the spoken number. Any other answer dismisses.
 - "Yes" (also "yeah", "sure", "show me") writes the criteria into `shared/app-state/contentFilter.store.ts`
   (moved there from `features/search/model` with a re-export shim so `features/juke` can reach it) and opens the
-  panel. Anything else dismisses. "Cancel" and "let's try again" work in the `search` prompt.
+  panel. Anything else dismisses. "Let's try again" restarts the search; "cancel" is the session command.
 - Once the filtered list is on screen, Milestone 4 targets ("the top one", "<name>") work on it.
 
 Tree acceptance:

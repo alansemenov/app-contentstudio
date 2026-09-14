@@ -37,19 +37,14 @@ import { bestUniqueMatch } from './matching';
 //   Juke: "Creating a new Blog called Summer news under Blogs"
 //
 // The type must be allowed under the chosen parent; otherwise Juke asks for a
-// different parent. "Cancel" leaves the dialog at any step.
+// different parent. "Cancel" (a session command) and "let's try again" leave the dialog at any step.
 //
 
 export type CreateStartArgs = { typeName: string };
-export type CreateParentArgs =
-    | { kind: 'root' }
-    | { kind: 'cancel' }
-    | { kind: 'restart' }
-    | { kind: 'named'; name: string };
-export type CreateNameArgs = { kind: 'cancel' } | { kind: 'restart' } | { kind: 'named'; name: string };
+export type CreateParentArgs = { kind: 'root' } | { kind: 'restart' } | { kind: 'named'; name: string };
+export type CreateNameArgs = { kind: 'restart' } | { kind: 'named'; name: string };
 
 const CREATE_PATTERN = /^(?:create|make|add|new)\s+(?:(?:a|an)\s+)?(?:new\s+)?(.+)$/;
-const CANCEL_PATTERN = /^(?:cancel|never mind|nevermind|stop|forget it|no)$/;
 const RESTART_PATTERN = /^(?:lets|let us)?\s*(?:try again|start over|start again|restart)$/;
 const ROOT_PATTERN = /^(?:(?:in|at|under|inside|to)\s+)?(?:the\s+)?(?:project\s+)?root(?:\s+(?:folder|level))?$/;
 const PARENT_PREFIX = /^(?:under|in|inside|below|into)\s+(?:the\s+)?/;
@@ -60,9 +55,6 @@ export function parseCreateStart(text: string): CreateStartArgs | null {
 }
 
 export function parseCreateParent(text: string): CreateParentArgs {
-    if (CANCEL_PATTERN.test(text)) {
-        return { kind: 'cancel' };
-    }
     if (RESTART_PATTERN.test(text)) {
         return { kind: 'restart' };
     }
@@ -73,9 +65,6 @@ export function parseCreateParent(text: string): CreateParentArgs {
 }
 
 export function parseCreateName(text: string): CreateNameArgs {
-    if (CANCEL_PATTERN.test(text)) {
-        return { kind: 'cancel' };
-    }
     if (RESTART_PATTERN.test(text)) {
         return { kind: 'restart' };
     }
@@ -150,12 +139,8 @@ async function createContent(flow: CreateFlow, displayName: string): Promise<Con
     return request.sendAndParse();
 }
 
-const cancelled = (): JukeReply => {
-    resetCreateFlow();
-    return { say: i18n('juke.reply.create.cancelled'), prompt: null };
-};
-
 // "Let's try again" drops everything collected so far and invites a fresh "create a ...".
+// Also the fallback when a prompt is open without flow state (cannot normally happen).
 const restarted = (): JukeReply => {
     resetCreateFlow();
     return { say: i18n('juke.reply.create.restart'), prompt: null };
@@ -183,10 +168,7 @@ export const createParentCommand: JukeCommand<CreateParentArgs> = {
     match: (text) => parseCreateParent(text),
     run: async (args) => {
         const flow = $createFlow.get();
-        if (args.kind === 'cancel' || flow == null) {
-            return cancelled();
-        }
-        if (args.kind === 'restart') {
+        if (args.kind === 'restart' || flow == null) {
             return restarted();
         }
         const title = flow.type.getTitle();
@@ -224,10 +206,7 @@ export const createNameCommand: JukeCommand<CreateNameArgs> = {
     match: (text) => parseCreateName(text),
     run: async (args) => {
         const flow = $createFlow.get();
-        if (args.kind === 'cancel' || flow == null) {
-            return cancelled();
-        }
-        if (args.kind === 'restart') {
+        if (args.kind === 'restart' || flow == null) {
             return restarted();
         }
         const title = flow.type.getTitle();

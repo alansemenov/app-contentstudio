@@ -175,11 +175,6 @@ describe('parseCreateParent', () => {
         expect(parseCreateParent(text)).toEqual({ kind: 'named', name });
     });
 
-    it('should recognize cancel', () => {
-        expect(parseCreateParent('cancel')).toEqual({ kind: 'cancel' });
-        expect(parseCreateParent('never mind')).toEqual({ kind: 'cancel' });
-    });
-
     it.each(['lets try again', 'let us try again', 'try again', 'start over', 'lets start over', 'restart'])(
         'should recognize "%s" as a restart',
         (text) => {
@@ -369,20 +364,15 @@ describe('create dialog', () => {
         expect(mocks.setDisplayName).toHaveBeenCalledWith('How are you');
     });
 
-    it('should cancel at either step', async () => {
+    it('should let the session cancel command abandon the dialog at either step', async () => {
         await runResolved('create a blog');
-        expect(await runResolved('cancel', 'createParent')).toEqual({
-            say: 'juke.reply.create.cancelled',
-            prompt: null,
-        });
+        expect(await runResolved('cancel', 'createParent')).toEqual({ say: 'juke.reply.cancel', prompt: null });
         expect($createFlow.get()).toBeNull();
 
         await runResolved('create a blog');
         await runResolved('root', 'createParent');
-        expect(await runResolved('never mind', 'createName')).toEqual({
-            say: 'juke.reply.create.cancelled',
-            prompt: null,
-        });
+        expect(await runResolved('never mind', 'createName')).toEqual({ say: 'juke.reply.cancel', prompt: null });
+        expect($createFlow.get()).toBeNull();
         expect(mocks.makeNewContentRequest).not.toHaveBeenCalled();
     });
 
