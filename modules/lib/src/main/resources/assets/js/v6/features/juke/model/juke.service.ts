@@ -159,6 +159,16 @@ const handleTranscripts = (alternatives: string[]): void => {
         return;
     }
 
+    // A general command spoken while a question is open (e.g. "create a folder"
+    // during a search) abandons the question and its collected state.
+    if (context.prompt != null && resolved.command.prompts?.includes(null)) {
+        setJukePrompt(null);
+        resetSearchFlow();
+        resetCreateFlow();
+        resetActionFlow();
+        context.prompt = null;
+    }
+
     enqueue(async () => {
         let reply: JukeReply | null;
         try {

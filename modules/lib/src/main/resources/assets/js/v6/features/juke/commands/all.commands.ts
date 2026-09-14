@@ -1,7 +1,7 @@
 import type { JukeCommand } from './command.types';
 import { contentCommands } from './content.commands';
 import { projectCommands } from './project.commands';
-import { searchCommands } from './search.commands';
+import { searchCommands, searchPromptCommands } from './search.commands';
 import { sessionCommands } from './session.commands';
 import { smallTalkCommands } from './smalltalk.commands';
 import { toolbarCommands } from './toolbar.commands';
@@ -12,7 +12,9 @@ import { treeCommands } from './tree.commands';
 //
 // Earlier commands win. Session commands come first so they beat any prompt;
 // fixed-phrase commands (search, tree) come before open-ended ones (create,
-// which accepts "new <anything>") so "new search" is a search, not a type.
+// which accepts "new <anything>") so "new search" is a search, not a type. The
+// search prompt's own answers come last: while a search is open, any phrase that
+// is a command runs as that command and only the rest counts as keywords.
 //
 
 export const allCommands: readonly JukeCommand[] = [
@@ -23,4 +25,5 @@ export const allCommands: readonly JukeCommand[] = [
     ...toolbarCommands,
     ...projectCommands,
     ...contentCommands,
+    ...searchPromptCommands,
 ];

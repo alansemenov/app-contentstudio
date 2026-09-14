@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Principal } from '@enonic/lib-admin-ui/security/Principal';
 import { $config } from '../../../shared/config/config.store';
 import { clearCommands, registerCommands } from '../commands/command.registry';
+import { $searchFlow } from './searchFlow.store';
 import type { Recognizer, RecognizerHandlers } from '../speech/recognizer';
 import type { Speaker } from '../speech/speaker';
 import { ECHO_GRACE_MS, start, stop } from './juke.service';
@@ -269,6 +270,32 @@ describe('juke.service', () => {
         await hear('help you with today how are you');
 
         expect(speeches[0].text).toBe('juke.reply.smalltalk.howAreYou|Alan');
+    });
+
+    it('abandons an open search when a general command is spoken', async () => {
+        // Registered before start so it precedes the search prompt's catch-all answer.
+        registerCommands({
+            id: 'test.general',
+            modes: ['dialog'],
+            prompts: [null, 'search'],
+            match: (text) => (text === 'do something' ? true : null),
+            run: () => ({ say: 'did it' }),
+        });
+        start({ createRecognizer, createSpeaker });
+        makeAvailable();
+
+        await hear('hello juke');
+        await finishSpeaking();
+        await hear('new search');
+        await finishSpeaking();
+        expect($jukePrompt.get()).toBe('search');
+        expect($searchFlow.get()).not.toBeNull();
+
+        await hear('do something');
+
+        expect(speeches[0].text).toBe('did it');
+        expect($jukePrompt.get()).toBeNull();
+        expect($searchFlow.get()).toBeNull();
     });
 
     it('speaks a failure reply when a command throws instead of falling silent', async () => {

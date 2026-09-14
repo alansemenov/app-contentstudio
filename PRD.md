@@ -276,9 +276,11 @@ Behaviour:
      opens `/edit/<id>?displayAsNew` in a new tab, leaves filter mode if active, expands the parent
      (`commands/tree-reveal.ts`), reveals the item in the browse tree with `revealContentByPath`, and confirms "Creating a new <Type> called <Name> under <Parent>" or "... in the
      root". Failure: failed reply, dialog closed.
-- While a prompt is pending only the prompt's own command and the session commands ("goodbye juke", "hello
-  juke") are recognized; small talk and "go to" are restricted to the no-prompt state so that any phrase can be
-  a name or a parent. Hello, goodbye and Juke turning off reset the create flow.
+- While a create prompt is pending only the prompt's own command and the session commands are recognized, so
+  any phrase can be a name or a parent. The search prompts are different: create, expand/collapse, "go to" and
+  the toolbar actions are recognized there too and abandon the search (state cleared, prompt dropped), because
+  inside a search only free text should become keywords; the search answers register last so command phrases
+  win (bug 2026-09-14: "create a new folder" during a stale search became keywords). Hello, goodbye and Juke turning off reset the create flow.
 - The edit tab is opened outside a user gesture, so browsers may block it as a pop-up; Content Studio then
   shows its standard pop-up warning. Allow pop-ups for the admin origin when demoing.
 

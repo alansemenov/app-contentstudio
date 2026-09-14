@@ -292,4 +292,8 @@ export const searchShowCommand: JukeCommand<ShowAnswer> = {
     },
 };
 
-export const searchCommands: readonly JukeCommand[] = [searchStartCommand, searchCriteriaCommand, searchShowCommand];
+export const searchCommands: readonly JukeCommand[] = [searchStartCommand];
+
+// Registered after every other command: inside a search, anything that is not a
+// recognizable command is free text.
+export const searchPromptCommands: readonly JukeCommand[] = [searchCriteriaCommand, searchShowCommand];

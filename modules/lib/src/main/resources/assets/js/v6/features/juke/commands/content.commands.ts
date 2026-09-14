@@ -151,7 +151,7 @@ const restarted = (): JukeReply => {
 export const createStartCommand: JukeCommand<CreateStartArgs> = {
     id: 'content.create.start',
     modes: ['dialog'],
-    prompts: [null],
+    prompts: [null, 'search', 'showResults'],
     match: (text) => parseCreateStart(text),
     run: async ({ typeName }, context) => {
         const types = await fetchCreatableTypes();

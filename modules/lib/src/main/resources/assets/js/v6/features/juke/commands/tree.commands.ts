@@ -84,7 +84,7 @@ function collapse(id: string): void {
 export const treeCommand: JukeCommand<TreeArgs> = {
     id: 'tree.toggle',
     modes: ['dialog'],
-    prompts: [null],
+    prompts: [null, 'search', 'showResults'],
     match: (text) => parseTreeCommand(text),
     run: ({ action, name }, context) => {
         // Recognition may hear the name wrong in its best guess ("expand both" for

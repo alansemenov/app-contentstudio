@@ -129,7 +129,7 @@ function ask(action: ActionFlow['action'], items: ContentSummary[], label: strin
 export const toolbarCommand: JukeCommand<ToolbarArgs> = {
     id: 'toolbar.action',
     modes: ['dialog'],
-    prompts: [null],
+    prompts: [null, 'search', 'showResults'],
     match: (text) => parseToolbar(text),
     run: async (args, context) => {
         const resolution = await resolveTarget(targetSpecs(args, context));

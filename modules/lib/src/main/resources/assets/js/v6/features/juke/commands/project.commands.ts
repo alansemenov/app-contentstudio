@@ -31,7 +31,7 @@ export function findProject(projects: readonly Readonly<Project>[], spokenName: 
 export const goToProjectCommand: JukeCommand<GoToArgs> = {
     id: 'project.goTo',
     modes: ['dialog'],
-    prompts: [null],
+    prompts: [null, 'search', 'showResults'],
     match: (text) => parseGoTo(text),
     run: ({ name }, context) => {
         const projects = $projects.get().projects;

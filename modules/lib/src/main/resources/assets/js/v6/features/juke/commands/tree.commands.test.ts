@@ -158,6 +158,6 @@ describe('treeCommand', () => {
 
     it('should only run in dialog mode without a pending prompt', () => {
         expect(treeCommand.modes).toEqual(['dialog']);
-        expect(treeCommand.prompts).toEqual([null]);
+        expect(treeCommand.prompts).toEqual([null, 'search', 'showResults']);
     });
 });

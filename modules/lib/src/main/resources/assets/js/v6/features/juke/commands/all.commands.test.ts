@@ -32,6 +32,19 @@ describe('allCommands registration order', () => {
         expect(resolveCommand([text], context())?.command.id).toBe(id);
     });
 
+    it('should let commands break out of an open search while free text stays keywords', () => {
+        expect(resolveCommand(['create a new folder'], context('search'))?.command.id).toBe('content.create.start');
+        expect(resolveCommand(['great and you folder', 'create a new folder'], context('search'))?.command.id).toBe(
+            'content.create.start',
+        );
+        expect(resolveCommand(['expand superhero'], context('search'))?.command.id).toBe('tree.toggle');
+        expect(resolveCommand(['go to superhero'], context('showResults'))?.command.id).toBe('project.goTo');
+        expect(resolveCommand(['delete the top one'], context('search'))?.command.id).toBe('toolbar.action');
+        expect(resolveCommand(['summer holiday'], context('search'))?.command.id).toBe('search.criteria');
+        expect(resolveCommand(['content type post'], context('search'))?.command.id).toBe('search.criteria');
+        expect(resolveCommand(['how are you'], context('search'))?.command.id).toBe('search.criteria');
+    });
+
     it('should route answers to the open prompt, with session commands still winning', () => {
         expect(resolveCommand(['content type post'], context('search'))?.command.id).toBe('search.criteria');
         expect(resolveCommand(['yes'], context('showResults'))?.command.id).toBe('search.show');

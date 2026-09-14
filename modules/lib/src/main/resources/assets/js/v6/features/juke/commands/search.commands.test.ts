@@ -6,7 +6,14 @@ import { $config } from '../../../shared/config/config.store';
 import { $searchFlow, resetSearchFlow } from '../model/searchFlow.store';
 import { clearCommands, registerCommands, resolveCommand } from './command.registry';
 import type { JukeContext, JukeReply } from './command.types';
-import { findModifier, parseCriteria, parseSearchAnswer, parseShowAnswer, searchCommands } from './search.commands';
+import {
+    findModifier,
+    parseCriteria,
+    parseSearchAnswer,
+    parseShowAnswer,
+    searchCommands,
+    searchPromptCommands,
+} from './search.commands';
 import { sessionCommands } from './session.commands';
 import { smallTalkCommands } from './smalltalk.commands';
 
@@ -135,7 +142,7 @@ describe('search dialog', () => {
         Object.values(mocks).forEach((mock) => mock.mockReset());
         resetSearchFlow();
         clearCommands();
-        registerCommands(...sessionCommands, ...smallTalkCommands, ...searchCommands);
+        registerCommands(...sessionCommands, ...smallTalkCommands, ...searchCommands, ...searchPromptCommands);
         mocks.fetchAllContentTypes.mockReturnValue(okAsync(types));
         mocks.runSearch.mockResolvedValue({ hits: 3, modifierCandidates: candidates });
         $config.setKey('user', {
