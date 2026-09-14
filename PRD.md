@@ -78,7 +78,8 @@ v6/features/juke/
     matching.ts                (M2) bestUniqueMatch(candidates, spoken) with exact > prefix > containment
     project.commands.ts        (M2) "go to <project>"
     content.commands.ts        (M2) "create a new <content type>"
-    search.commands.ts         (M3) "new search", filter phrases, keywords, "yes" to show results
+    search.commands.ts         (M3) "new search", criteria parser, "yes" to show results; state in model/searchFlow.store.ts
+    search-query.ts            (M3) criteria -> SearchInputValues, hit count via ContentAggregationsFetcher, apply to panel
     tree.commands.ts           (M3) expand / collapse a visible tree item by name
     target.ts                  (M4) resolves a spoken target: position in the visible list, name, implicit
                                selection, or "all"
@@ -135,7 +136,7 @@ phrase, so nothing falls through to the unknown reply while a question is open.
 | Content types for New Content | `fetchContentTypesByContent` / `fetchAllContentTypes` in `entities/schema/api/contentTypes.api.ts` |
 | Create content | new v6 wrapper `createContent()` in `entities/content/api` calling `getCmsApiUrl('create')`, body as in legacy `app/resource/CreateContentRequest.ts` |
 | Open edit tab | `ContentUrlHelper.openEditContentTab()` (`app/util/ContentUrlHelper.ts`) or `new EditContentEvent([summary]).fire()` |
-| Filter panel | `setContentFilterOpen`, `setContentFilterValue`, `setContentFilterSelection`, `resetContentFilter` in `features/search/model/contentFilter.store.ts`; aggregation names in `app/browse/filter/ContentAggregation.ts` (`contentTypes`, `workflow`, `lastModified`, `modifier`) |
+| Filter panel | `setContentFilterOpen`, `setContentFilterValue`, `setContentFilterSelection`, `resetContentFilter` in `shared/app-state/contentFilter.store.ts` (re-exported from `features/search/model/contentFilter.store.ts`); aggregation names in `app/browse/filter/ContentAggregation.ts` (`contentTypes`, `workflow`, `lastModified`, `modifier`) |
 | Count hits without applying | `queryContent` in `entities/content/api/contentQuery.api.ts` with the same query the filter panel would build (`ContentBrowseFilterPanel.doSearch`) |
 | Displayed list order | `$activeFlatNodes` in `entities/content/model/active-tree.store.ts` (`node.id`, `node.data.displayName`) |
 | Implicit target | `getCurrentItems()` in `entities/content/model/content-selection.store.ts` (selected items, else the highlighted row) |
@@ -267,7 +268,7 @@ switch and not-found, and the create dialog end to end through the registry: typ
 root parent, unknown/ambiguous/disallowed parent, naming and creation, cancel at each step, goodbye during a
 prompt, creation failure.
 
-### Milestone 3 — Search and tree navigation
+### Milestone 3 — Search and tree navigation (done)
 
 Selection as a separate step is dropped (decided 2026-09-13): its only purpose was to feed Milestone 4, whose
 commands now name their target directly.
@@ -276,6 +277,8 @@ Phrases:
 - `juke.reply.search.start=What are you looking for?`
 - `juke.reply.search.none=I couldn't find any content items matching your criteria. Try a different search.`
 - `juke.reply.search.found=I found {0} content items matching your criteria. Do you want to see them?`
+- `juke.reply.search.showing=Here they are. {0} items.` / `juke.reply.search.dismissed=Okay.`
+- `juke.reply.search.typeNotFound`, `juke.reply.search.userNotFound`, `juke.reply.search.cancelled`
 - `juke.reply.tree.expanding=Expanding {0}`
 - `juke.reply.tree.collapsing=Collapsing {0}`
 - `juke.reply.tree.alreadyExpanded={0} is already expanded`
@@ -289,14 +292,19 @@ Search acceptance:
 - In `search`, each utterance is parsed left to right into criteria; several may appear in one utterance:
   `content type <x>`, `last modified by me|<user>`, `last modified today`, `last modified this week`,
   `in progress`. Anything else becomes free-text keywords.
-- After each utterance Juke runs `content/query` with the same query the filter panel would produce (keywords,
-  content type bucket, modifier bucket, lastModified range, workflow bucket) and answers with none/found.
-  "Found" enters the `showResults` prompt and leaves `search`.
+- After each utterance Juke builds the same `SearchInputValues` the filter panel builds from its state
+  (`commands/search-query.ts`: keywords as text, `AggregationSelection`s for content types, modifier, a
+  `DateRangeBucket` for last modified, `in_progress` workflow bucket) and runs the panel's own
+  `ContentAggregationsFetcher.getAggregations()`; the total is the hit count. "Found" enters `showResults`;
+  zero hits keeps the `search` prompt open so the criteria can be refined (criteria accumulate across
+  utterances). Content type names resolve against `schema/content/all` titles; "me" resolves to
+  `config.user`; other user names resolve against the modifier buckets of the current search, mapped to display
+  names through `getPrincipalsByKeys`. Unknown type or user: matching reply, prompt stays.
 - "Yes" to `showResults` opens the filter panel, writes value and selection into `$contentFilterState`, so the
   list applies the same filter. Hit count in the panel equals the spoken number. Any other answer dismisses.
-- Aggregation bucket keys are resolved from a `content/query` with `aggregationQueries` so that content type,
-  modifier and workflow buckets use the exact keys the panel expects (content type name, principal key,
-  workflow state).
+- "Yes" (also "yeah", "sure", "show me") writes the criteria into `shared/app-state/contentFilter.store.ts`
+  (moved there from `features/search/model` with a re-export shim so `features/juke` can reach it) and opens the
+  panel. Anything else dismisses. "Cancel" and "let's try again" work in the `search` prompt.
 - Once the filtered list is on screen, Milestone 4 targets ("the top one", "<name>") work on it.
 
 Tree acceptance:

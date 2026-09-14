@@ -1,0 +1,61 @@
+import { type AggregationSelection } from '@enonic/lib-admin-ui/aggregation/AggregationSelection';
+import { computed, map } from 'nanostores';
+
+export { $isContentFilterOpen, setContentFilterOpen } from './browsePanels.store';
+
+type ContentFilterStore = {
+    value: string;
+    selection: AggregationSelection[];
+};
+
+export const $contentFilterState = map<ContentFilterStore>({
+    value: '',
+    selection: [],
+});
+
+export const $isContentFilterDirty = computed(
+    $contentFilterState,
+    ({ value, selection }) => value.trim().length > 0 || selection.length > 0,
+);
+
+export function setContentFilterValue(value: string): void {
+    $contentFilterState.setKey('value', value);
+}
+
+export function setContentFilterSelection(selection: AggregationSelection[]): void {
+    $contentFilterState.setKey('selection', selection);
+}
+
+// TODO: Enonic UI - Remove legacy functions
+
+export function getFilterValue(): string {
+    return $contentFilterState.get().value;
+}
+
+export function getFilterSelection(): AggregationSelection[] {
+    return $contentFilterState.get().selection;
+}
+
+export function hasFilterSet(): boolean {
+    return hasFilterValueSet() || hasFilterSelectionSet();
+}
+
+export function hasFilterValueSet(): boolean {
+    const value = getFilterValue();
+    return typeof value === 'string' && value.trim().length > 0;
+}
+
+export function hasFilterSelectionSet(): boolean {
+    return getFilterSelection().length > 0;
+}
+
+export function resetContentFilter(): void {
+    $contentFilterState.set({
+        value: '',
+        selection: [],
+    });
+}
+
+export function deselectAllFilterBuckets(): void {
+    $contentFilterState.setKey('selection', []);
+}

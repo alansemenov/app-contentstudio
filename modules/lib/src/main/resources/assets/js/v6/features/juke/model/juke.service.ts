@@ -3,9 +3,11 @@ import { i18n } from '@enonic/lib-admin-ui/util/Messages';
 import { registerCommands, resolveCommand } from '../commands/command.registry';
 import { contentCommands } from '../commands/content.commands';
 import { projectCommands } from '../commands/project.commands';
+import { searchCommands } from '../commands/search.commands';
 import type { JukeReply } from '../commands/command.types';
 import { sessionCommands, stripJukeAddress } from '../commands/session.commands';
 import { smallTalkCommands } from '../commands/smalltalk.commands';
+import { treeCommands } from '../commands/tree.commands';
 import { normalizeTranscript } from '../speech/normalize';
 import {
     createRecognizer as defaultCreateRecognizer,
@@ -14,6 +16,7 @@ import {
 } from '../speech/recognizer';
 import { createSpeaker as defaultCreateSpeaker, type Speaker } from '../speech/speaker';
 import { resetCreateFlow } from './createFlow.store';
+import { resetSearchFlow } from './searchFlow.store';
 import {
     $jukeAvailable,
     getJukeContext,
@@ -143,6 +146,7 @@ const deactivate = (): void => {
     speaker = null;
     resetJukeState();
     resetCreateFlow();
+    resetSearchFlow();
 };
 
 const handleDenied = (): void => {
@@ -175,7 +179,14 @@ export const start = (overrides: JukeServiceDeps = {}): void => {
         return;
     }
     deps = { ...deps, ...overrides };
-    registerCommands(...sessionCommands, ...smallTalkCommands, ...projectCommands, ...contentCommands);
+    registerCommands(
+        ...sessionCommands,
+        ...smallTalkCommands,
+        ...projectCommands,
+        ...contentCommands,
+        ...searchCommands,
+        ...treeCommands,
+    );
     unsubscribe = $jukeAvailable.subscribe((available) => {
         if (available) {
             activate();
