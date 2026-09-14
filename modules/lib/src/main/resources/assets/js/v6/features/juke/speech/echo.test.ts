@@ -11,12 +11,12 @@ describe('echoKey', () => {
         expect(echoKey('hear')).toBe(echoKey('here'));
         expect(echoKey('one')).toBe(echoKey('1'));
         expect(echoKey('three')).toBe('3');
-        expect(echoKey('items')).toBe(echoKey('items'));
+        expect(echoKey('posts')).toBe(echoKey('post'));
+        expect(echoKey('items')).toBe(echoKey('item'));
     });
 
     it('should keep different words apart', () => {
         expect(echoKey('yes')).not.toBe(echoKey('yet'));
-        expect(echoKey('post')).not.toBe(echoKey('posts'));
         expect(echoKey('search')).not.toBe(echoKey('surge'));
     });
 });
@@ -57,6 +57,7 @@ describe('isEchoOf', () => {
         expect(isEchoOf('here they are three items', recent)).toBe(true);
         expect(isEchoOf('hear they are one items', 'Here they are. 1 items.')).toBe(true);
         expect(isEchoOf('here it is', 'Here it is.')).toBe(true);
+        expect(isEchoOf('is moved under post', 'Summer news is moved under Posts.')).toBe(true);
         expect(isEchoOf('i found free content items matching your criteria', recent)).toBe(true);
     });
 

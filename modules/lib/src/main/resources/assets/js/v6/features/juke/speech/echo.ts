@@ -46,8 +46,9 @@ export function echoKey(word: string): string {
     if (letters.length <= 1) {
         return letters;
     }
-    const skeleton = letters[0] + letters.slice(1).replace(/[aeiouyhw]/g, '');
-    return skeleton.replace(/(.)\1+/g, '$1');
+    const skeleton = (letters[0] + letters.slice(1).replace(/[aeiouyhw]/g, '')).replace(/(.)\1+/g, '$1');
+    // Plurals collapse onto the singular ("posts" / "post", "items" / "item").
+    return skeleton.length > 3 && skeleton.endsWith('s') ? skeleton.slice(0, -1) : skeleton;
 }
 
 function words(text: string): string[] {
