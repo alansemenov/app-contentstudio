@@ -66,10 +66,11 @@ type ItemOptions = { page?: boolean; site?: boolean; media?: boolean; path?: str
 const item = (id: string, displayName: string, options: ItemOptions = {}): ContentSummary => {
     const contentId = { toString: () => id };
     const pathString = options.path ?? `/${id}`;
+    const parentPath = { toString: () => pathString.replace(/\/[^/]+$/, '') || '/' };
     const path = {
         toString: () => pathString,
         isRoot: () => pathString === '/',
-        getParentPath: () => ({ toString: () => pathString.replace(/\/[^/]+$/, '') || '/' }),
+        getParentPath: () => parentPath,
     };
     const type = { isMedia: () => options.media === true, isDescendantOfMedia: () => options.media === true };
     return {
