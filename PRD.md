@@ -192,8 +192,8 @@ Behaviour:
 - Any other phrase in dialog mode gets the unknown reply.
 - Replies are spoken one at a time through a queue. Recognition keeps running while Juke speaks (pausing it lost
   quick answers in the recognizer's restart gap); transcripts finalized while speaking or within 250 ms after,
-  and transcripts whose words are at least 60 % contained in the last reply (`speech/echo.ts`), are dropped as
-  Juke's own echo. When no pause separates the reply and the answer, Chrome merges them into one transcript;
+  and transcripts whose words are at least 60 % contained in one of the last three replies (`speech/echo.ts`;
+  Chrome may finalize an echo only after the next reply started), are dropped as Juke's own echo. When no pause separates the reply and the answer, Chrome merges them into one transcript;
   the leading run of words Juke just said is stripped and the remainder is the answer. A command that throws or takes longer than 20 s
   gets `juke.reply.failed` spoken and logged, so Juke never falls silent. Every recognized phrase and the
   resolved command id are logged with `console.info('[juke] heard', ...)` for diagnosis.

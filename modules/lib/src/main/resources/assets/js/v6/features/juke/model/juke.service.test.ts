@@ -244,6 +244,19 @@ describe('juke.service', () => {
         expect(speeches[0].text).toBe('juke.reply.smalltalk.howAreYou|Alan');
     });
 
+    it('ignores a late echo of an earlier reply after a newer one', async () => {
+        start({ createRecognizer, createSpeaker });
+        makeAvailable();
+
+        await hear('hello juke');
+        await finishSpeaking();
+        await hear('how are you');
+        await finishSpeaking();
+
+        await hear('juke reply hello alan');
+        expect(speeches).toHaveLength(0);
+    });
+
     it('keeps the answer when Chrome merges it with the end of the question', async () => {
         start({ createRecognizer, createSpeaker });
         makeAvailable();

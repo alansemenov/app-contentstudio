@@ -55,7 +55,9 @@ let queue: Promise<void> = Promise.resolve();
 export const ECHO_GRACE_MS = 250;
 let speaking = false;
 let speechEndedAt = 0;
-let lastSpoken: string | null = null;
+// The last few replies; see isEchoOf for why more than one is kept.
+export const RECENT_SPOKEN_SIZE = 3;
+let recentSpoken: string[] = [];
 
 // A command that neither answers nor fails within this time is treated as failed,
 // so Juke never falls silent with the queue blocked behind it.
@@ -85,7 +87,7 @@ const enqueue = (task: () => Promise<void>): void => {
 const respond = async (reply: JukeReply): Promise<void> => {
     setJukeActivity('speaking');
     speaking = true;
-    lastSpoken = reply.say;
+    recentSpoken = [reply.say, ...recentSpoken].slice(0, RECENT_SPOKEN_SIZE);
     try {
         await speaker?.speak(reply.say);
     } finally {
@@ -108,8 +110,8 @@ const withoutSelfEcho = (normalized: readonly string[]): string[] | null => {
         return null;
     }
     const remaining = normalized
-        .map((text) => stripEchoPrefix(text, lastSpoken))
-        .filter((text) => text.length > 0 && !isEchoOf(text, lastSpoken));
+        .map((text) => stripEchoPrefix(text, recentSpoken))
+        .filter((text) => text.length > 0 && !isEchoOf(text, recentSpoken));
     return remaining.length > 0 ? remaining : null;
 };
 
@@ -173,7 +175,7 @@ const deactivate = (): void => {
     resetSearchFlow();
     speaking = false;
     speechEndedAt = 0;
-    lastSpoken = null;
+    recentSpoken = [];
 };
 
 const handleDenied = (): void => {

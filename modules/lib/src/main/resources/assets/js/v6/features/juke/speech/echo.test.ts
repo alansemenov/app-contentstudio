@@ -31,6 +31,14 @@ describe('isEchoOf', () => {
         expect(isEchoOf('under blogs', 'Where do you want to create a new Blog Post?')).toBe(false);
     });
 
+    it('should match against any of several recent replies', () => {
+        const recent = ['Here they are. 3 items.', spoken];
+        expect(isEchoOf('i found 3 content items matching your criteria', recent)).toBe(true);
+        expect(isEchoOf('here they are three items', recent)).toBe(true);
+        expect(stripEchoPrefix('see them yes', recent)).toBe('yes');
+        expect(isEchoOf('new search', recent)).toBe(false);
+    });
+
     it('should never flag when nothing was spoken', () => {
         expect(isEchoOf('hello juke', null)).toBe(false);
         expect(isEchoOf('', spoken)).toBe(false);
