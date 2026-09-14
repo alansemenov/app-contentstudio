@@ -19,6 +19,8 @@ describe('allCommands registration order', () => {
         ['new search', 'search.start'],
         ['search', 'search.start'],
         ['find summer news', 'search.start'],
+        ['hide search', 'search.panel'],
+        ['expand the search panel', 'search.panel'],
         ['look up posts', 'search.start'],
         ['expand superhero', 'tree.toggle'],
         ['collapse the blogs', 'tree.toggle'],

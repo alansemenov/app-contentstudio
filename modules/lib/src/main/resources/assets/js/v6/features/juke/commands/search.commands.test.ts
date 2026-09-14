@@ -23,6 +23,7 @@ const { mocks } = vi.hoisted(() => ({
         runSearch: vi.fn(),
         applySearchToFilterPanel: vi.fn(),
         resetContentFilter: vi.fn(),
+        setContentFilterOpen: vi.fn(),
     },
 }));
 
@@ -36,6 +37,7 @@ vi.mock('../../../entities/schema/api/contentTypes.api', () => ({
 
 vi.mock('../../../shared/app-state/contentFilter.store', () => ({
     resetContentFilter: mocks.resetContentFilter,
+    setContentFilterOpen: mocks.setContentFilterOpen,
 }));
 
 vi.mock('./search-query', () => ({
@@ -272,6 +274,20 @@ describe('search dialog', () => {
         expect(mocks.runSearch).toHaveBeenLastCalledWith(
             expect.objectContaining({ contentTypes: [{ key: 'com.example:post', title: 'Post' }] }),
         );
+    });
+
+    it.each([
+        ['hide search', false],
+        ['hide the search panel', false],
+        ['close the filter', false],
+        ['collapse filters', false],
+        ['show search', true],
+        ['open the filter panel', true],
+    ])('should toggle the filter panel on "%s"', async (text, open) => {
+        const reply = await say(text);
+        expect(mocks.setContentFilterOpen).toHaveBeenLastCalledWith(open);
+        expect(reply).toEqual({ say: open ? 'juke.reply.search.panelShown' : 'juke.reply.search.panelHidden' });
+        expect(mocks.resetContentFilter).not.toHaveBeenCalled();
     });
 
     it('should not start on phrases merely containing search', () => {

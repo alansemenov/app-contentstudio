@@ -335,6 +335,8 @@ Search acceptance:
 - "Yes" (also "yeah", "sure", "show me") writes the criteria into `shared/app-state/contentFilter.store.ts`
   (moved there from `features/search/model` with a re-export shim so `features/juke` can reach it) and opens the
   panel. Anything else dismisses. "Let's try again" restarts the search; "cancel" is the session command.
+- "Hide search" (also "close"/"collapse" + "search"/"filter"/"filter panel") collapses the filter panel and
+  "show search"/"open the filter panel" opens it; the applied filter is untouched (`setContentFilterOpen`).
 - Once the filtered list is on screen, Milestone 4 targets ("the top one", "<name>") work on it.
 
 Tree acceptance:

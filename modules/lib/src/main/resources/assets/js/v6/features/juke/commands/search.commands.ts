@@ -1,7 +1,7 @@
 import { i18n } from '@enonic/lib-admin-ui/util/Messages';
 import { fetchAllContentTypes } from '../../../entities/schema/api/contentTypes.api';
 import { $config } from '../../../shared/config/config.store';
-import { resetContentFilter } from '../../../shared/app-state/contentFilter.store';
+import { resetContentFilter, setContentFilterOpen } from '../../../shared/app-state/contentFilter.store';
 import { resetActionFlow } from '../model/actionFlow.store';
 import { resetCreateFlow } from '../model/createFlow.store';
 import {
@@ -54,6 +54,16 @@ const START_PATTERN =
 const FIND_PATTERN = /^(?:find|look up|lookup|look for|search for)(?:\s+(.+))?$/;
 
 export type SearchStartArgs = { criteria?: string };
+export type SearchPanelArgs = { open: boolean };
+
+// "hide search" / "show search" toggle the filter panel; the applied filter stays.
+const PANEL_PATTERN =
+    /^(?:(hide|close|collapse)|(show|open|expand))\s+(?:the\s+)?(?:search|filter|filters)(?:\s+panel)?$/;
+
+export function parseSearchPanel(text: string): SearchPanelArgs | null {
+    const match = PANEL_PATTERN.exec(text);
+    return match ? { open: match[2] != null } : null;
+}
 
 export function parseSearchStart(text: string): SearchStartArgs | null {
     if (START_PATTERN.test(text)) {
@@ -292,7 +302,18 @@ export const searchShowCommand: JukeCommand<ShowAnswer> = {
     },
 };
 
-export const searchCommands: readonly JukeCommand[] = [searchStartCommand];
+export const searchPanelCommand: JukeCommand<SearchPanelArgs> = {
+    id: 'search.panel',
+    modes: ['dialog'],
+    prompts: [null, 'search', 'showResults'],
+    match: (text) => parseSearchPanel(text),
+    run: ({ open }) => {
+        setContentFilterOpen(open);
+        return { say: i18n(open ? 'juke.reply.search.panelShown' : 'juke.reply.search.panelHidden') };
+    },
+};
+
+export const searchCommands: readonly JukeCommand[] = [searchStartCommand, searchPanelCommand];
 
 // Registered after every other command: inside a search, anything that is not a
 // recognizable command is free text.
