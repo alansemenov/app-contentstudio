@@ -7,7 +7,7 @@ import type { JukeContext, JukeReply } from './command.types';
 import { sessionCommands } from './session.commands';
 import { parseMoveTarget, parseToolbar, parseYesNo, toolbarCommands } from './toolbar.commands';
 
-const { mocks, filter } = vi.hoisted(() => ({
+const { mocks } = vi.hoisted(() => ({
     mocks: {
         resolveTarget: vi.fn(),
         openEditContentTab: vi.fn(),
@@ -17,10 +17,9 @@ const { mocks, filter } = vi.hoisted(() => ({
         duplicateContent: vi.fn(),
         trackTask: vi.fn(),
         findContentByName: vi.fn(),
-        revealContentByPath: vi.fn(),
-        resetContentFilter: vi.fn(),
+        leaveFilterMode: vi.fn(),
+        expandInTree: vi.fn(),
     },
-    filter: { active: false, listeners: [] as ((active: boolean) => void)[] },
 }));
 
 vi.mock('@enonic/lib-admin-ui/util/Messages', () => ({
@@ -46,19 +45,10 @@ vi.mock('../../../entities/content/api/delete.api', () => ({ archiveContent: moc
 vi.mock('../../../entities/content/api/move.api', () => ({ moveContent: mocks.moveContent }));
 vi.mock('../../../entities/content/api/duplicate.api', () => ({ duplicateContent: mocks.duplicateContent }));
 vi.mock('../../../entities/task/task.service', () => ({ trackTask: mocks.trackTask }));
-vi.mock('../../../entities/content', () => ({
-    revealContentByPath: mocks.revealContentByPath,
-    $isFilterActive: {
-        get: () => filter.active,
-        subscribe: (listener: (active: boolean) => void) => {
-            filter.listeners.push(listener);
-            return () => {
-                filter.listeners = filter.listeners.filter((l) => l !== listener);
-            };
-        },
-    },
+vi.mock('./tree-reveal', () => ({
+    leaveFilterMode: mocks.leaveFilterMode,
+    expandInTree: mocks.expandInTree,
 }));
-vi.mock('../../../shared/app-state/contentFilter.store', () => ({ resetContentFilter: mocks.resetContentFilter }));
 vi.mock('./content-lookup', () => ({
     findContentByName: mocks.findContentByName,
     canHoldChildren: () => true,
@@ -68,7 +58,12 @@ type ItemOptions = { page?: boolean; site?: boolean; media?: boolean; path?: str
 
 const item = (id: string, displayName: string, options: ItemOptions = {}): ContentSummary => {
     const contentId = { toString: () => id };
-    const path = { toString: () => options.path ?? `/${id}` };
+    const pathString = options.path ?? `/${id}`;
+    const path = {
+        toString: () => pathString,
+        isRoot: () => pathString === '/',
+        getParentPath: () => ({ toString: () => pathString.replace(/\/[^/]+$/, '') || '/' }),
+    };
     const type = { isMedia: () => options.media === true, isDescendantOfMedia: () => options.media === true };
     return {
         getId: () => id,
@@ -158,9 +153,8 @@ describe('toolbar actions', () => {
             return () => undefined;
         });
         mocks.findContentByName.mockResolvedValue({ kind: 'match', value: blogs });
-        mocks.revealContentByPath.mockResolvedValue(undefined);
-        filter.active = false;
-        filter.listeners = [];
+        mocks.leaveFilterMode.mockResolvedValue(undefined);
+        mocks.expandInTree.mockResolvedValue(undefined);
     });
 
     it('should pass the target specs from every alternative to the resolver', async () => {
@@ -242,30 +236,8 @@ describe('toolbar actions', () => {
         });
         expect(mocks.findContentByName).toHaveBeenCalledWith('blogs', { accept: expect.any(Function) });
         expect(mocks.moveContent).toHaveBeenCalledWith([post.getContentId()], blogs.getPath());
-        expect(mocks.revealContentByPath).toHaveBeenCalledWith('/superhero/blogs', {
-            select: false,
-            expandTarget: true,
-        });
-    });
-
-    it('should clear an active filter and wait for the tree before expanding the destination', async () => {
-        filter.active = true;
-        mocks.resetContentFilter.mockImplementation(() => {
-            queueMicrotask(() => {
-                filter.active = false;
-                filter.listeners.forEach((listener) => listener(false));
-            });
-        });
-        await say('move summer news');
-
-        const reply = await say('under blogs', 'moveTarget');
-
-        expect(mocks.resetContentFilter).toHaveBeenCalledTimes(1);
-        expect(mocks.revealContentByPath).toHaveBeenCalledWith('/superhero/blogs', {
-            select: false,
-            expandTarget: true,
-        });
-        expect(reply).toEqual({ say: 'juke.reply.move.done|Summer news|Blogs', prompt: null });
+        expect(mocks.leaveFilterMode).toHaveBeenCalledTimes(1);
+        expect(mocks.expandInTree).toHaveBeenCalledWith(blogs.getPath());
     });
 
     it('should exclude the moved items and their descendants as destinations', async () => {

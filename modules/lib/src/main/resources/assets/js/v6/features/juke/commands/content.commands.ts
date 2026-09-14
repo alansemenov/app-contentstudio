@@ -24,6 +24,7 @@ import {
 } from '../model/createFlow.store';
 import type { JukeCommand, JukeReply } from './command.types';
 import { canHoldChildren, findContentByName } from './content-lookup';
+import { expandInTree, leaveFilterMode } from './tree-reveal';
 import { bestUniqueMatch, parseAlternatives } from './matching';
 
 //
@@ -236,7 +237,10 @@ export const createNameCommand: JukeCommand<CreateNameArgs> = {
             ContentUrlHelper.openEditContentTab(
                 ContentEditParams.create(content.getContentId()).setDisplayAsNew(true).build(),
             );
-            // Expands the parent chain in the browse tree and highlights the new item.
+            // Shows the new item: leave the filtered list, expand the parent, then
+            // highlight the item once the tree has it.
+            await leaveFilterMode();
+            await expandInTree(content.getPath().getParentPath());
             await revealContentByPath(content.getPath().toString()).catch(() => undefined);
         } catch (error) {
             console.error('[juke] content creation failed', error);

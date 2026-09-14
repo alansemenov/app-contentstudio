@@ -32,6 +32,8 @@ const { mocks } = vi.hoisted(() => ({
         contentExistsByPath: vi.fn(),
         openEditContentTab: vi.fn(),
         revealContentByPath: vi.fn(),
+        leaveFilterMode: vi.fn(),
+        expandInTree: vi.fn(),
         getActiveProject: vi.fn(),
         findContentByName: vi.fn(),
     },
@@ -96,6 +98,11 @@ vi.mock('../../../entities/content', () => ({
 
 vi.mock('../../../entities/project', () => ({
     getActiveProject: mocks.getActiveProject,
+}));
+
+vi.mock('./tree-reveal', () => ({
+    leaveFilterMode: mocks.leaveFilterMode,
+    expandInTree: mocks.expandInTree,
 }));
 
 vi.mock('./content-lookup', () => ({
@@ -224,7 +231,11 @@ describe('toDisplayName', () => {
 });
 
 describe('create dialog', () => {
-    const created = { getContentId: () => 'new-id', getPath: () => ({ toString: () => '/blogs/new' }) };
+    const createdParent = { toString: () => '/blogs', isRoot: () => false };
+    const created = {
+        getContentId: () => 'new-id',
+        getPath: () => ({ toString: () => '/blogs/new', getParentPath: () => createdParent }),
+    };
     const blogs = summary('blogs-id', 'Blogs', 'BLOGS_PATH');
 
     beforeEach(() => {
@@ -251,6 +262,8 @@ describe('create dialog', () => {
         $config.setKey('allowPathTransliteration', true);
         mocks.findContentByName.mockResolvedValue({ kind: 'match', value: blogs });
         mocks.revealContentByPath.mockResolvedValue(undefined);
+        mocks.leaveFilterMode.mockResolvedValue(undefined);
+        mocks.expandInTree.mockResolvedValue(undefined);
     });
 
     it('should ask where to create after resolving the type', async () => {
@@ -355,6 +368,8 @@ describe('create dialog', () => {
         expect(mocks.contentExistsByPath).toHaveBeenCalledWith('BLOGS_PATH/summer-news');
         expect(mocks.setName).toHaveBeenCalledWith('NAME:summer-news');
         expect(mocks.openEditContentTab).toHaveBeenCalledWith({ contentId: 'new-id', displayAsNew: true });
+        expect(mocks.leaveFilterMode).toHaveBeenCalledTimes(1);
+        expect(mocks.expandInTree).toHaveBeenCalledWith(createdParent);
         expect(mocks.revealContentByPath).toHaveBeenCalledWith('/blogs/new');
         expect(reply).toEqual({ say: 'juke.reply.create.creating|Blog Post|Summer news|Blogs', prompt: null });
         expect($createFlow.get()).toBeNull();

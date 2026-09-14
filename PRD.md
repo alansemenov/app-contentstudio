@@ -273,8 +273,8 @@ Behaviour:
      creates through the legacy `CreateContentRequest` (display name set; path name generated from it with the
      wizard's rules — `NamePrettyfier.prettify`, or simplified for media / when `allowPathTransliteration` is off —
      and suffixed `-1`, `-2`, … via `contentExistsByPath` when the path is taken; workflow in progress),
-     opens `/edit/<id>?displayAsNew` in a new tab, reveals the item in the browse tree with
-     `revealContentByPath`, and confirms "Creating a new <Type> called <Name> under <Parent>" or "... in the
+     opens `/edit/<id>?displayAsNew` in a new tab, leaves filter mode if active, expands the parent
+     (`commands/tree-reveal.ts`), reveals the item in the browse tree with `revealContentByPath`, and confirms "Creating a new <Type> called <Name> under <Parent>" or "... in the
      root". Failure: failed reply, dialog closed.
 - While a prompt is pending only the prompt's own command and the session commands ("goodbye juke", "hello
   juke") are recognized; small talk and "go to" are restricted to the no-prompt state so that any phrase can be
@@ -399,8 +399,9 @@ Acceptance:
   and waits for the tree to return (`$isFilterActive`, 3 s timeout) — and expands the destination in the tree
   (`revealContentByPath` with `select: false, expandTarget: true`) and speaks done; not found / ambiguous keep
   the prompt; "cancel" cancels. "Move all" is refused.
-- Duplicate: children question → `duplicateChildren`. "Yes"/"no" duplicates with or without children via
-  `duplicateContent` and speaks the matching reply; "cancel" cancels.
+- Duplicate: children question → `duplicateChildren`. "Yes"/"no" leaves filter mode if active, duplicates with or
+  without children via `duplicateContent`, expands the originals' parent and speaks the matching reply; "cancel"
+  cancels.
 - Preview: one tab per previewable resolved item (has a page, is a site, or is media) via
   `PreviewActionHelper.openWindows` with the default portal preview (the active preview widget lives in the
   widgets layer, out of reach for a feature); non-previewable items are skipped; if none can, the none reply.

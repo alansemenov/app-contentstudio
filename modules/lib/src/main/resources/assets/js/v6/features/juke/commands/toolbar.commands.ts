@@ -7,8 +7,6 @@ import { ContentUrlHelper } from '../../../../app/util/ContentUrlHelper';
 import { archiveContent } from '../../../entities/content/api/delete.api';
 import { duplicateContent } from '../../../entities/content/api/duplicate.api';
 import { moveContent } from '../../../entities/content/api/move.api';
-import { $isFilterActive, revealContentByPath } from '../../../entities/content';
-import { resetContentFilter } from '../../../shared/app-state/contentFilter.store';
 import { trackTask } from '../../../entities/task/task.service';
 import type { AppError } from '../../../shared/api/errors';
 import { $actionFlow, resetActionFlow, startActionFlow, type ActionFlow } from '../model/actionFlow.store';
@@ -16,6 +14,7 @@ import type { JukeCommand, JukeContext, JukeReply } from './command.types';
 import { canHoldChildren, findContentByName } from './content-lookup';
 import { parseAlternatives } from './matching';
 import { parseTarget, resolveTarget, type TargetSpec } from './target';
+import { expandInTree, leaveFilterMode } from './tree-reveal';
 
 //
 // * Toolbar actions on a spoken target
@@ -81,28 +80,6 @@ function targetSpecs(args: ToolbarArgs, context: JukeContext): TargetSpec[] {
     return parseAlternatives(context.alternatives, `${args.action} ${args.target}`.trim(), (text) => {
         const parsed = parseToolbar(text);
         return parsed?.action === args.action ? parseTarget(parsed.target) : null;
-    });
-}
-
-const FILTER_RESET_TIMEOUT_MS = 3000;
-
-// The filtered list hides the tree, so a move made from it clears the filter
-// and waits for the tree to come back before the destination is expanded.
-async function leaveFilterMode(): Promise<void> {
-    if (!$isFilterActive.get()) {
-        return;
-    }
-    resetContentFilter();
-    await new Promise<void>((resolve) => {
-        const timer = setTimeout(done, FILTER_RESET_TIMEOUT_MS);
-        const unsubscribe = $isFilterActive.subscribe((active) => {
-            if (!active) done();
-        });
-        function done(): void {
-            clearTimeout(timer);
-            unsubscribe();
-            resolve();
-        }
     });
 }
 
@@ -274,9 +251,7 @@ export const moveTargetCommand: JukeCommand<MoveTargetArgs> = {
         if (destination != null) {
             // Shows the moved items in their new place without changing the selection.
             await leaveFilterMode();
-            await revealContentByPath(destination.getPath().toString(), { select: false, expandTarget: true }).catch(
-                () => undefined,
-            );
+            await expandInTree(destination.getPath());
         }
         return finished(
             destination != null
@@ -300,12 +275,16 @@ export const duplicateChildrenCommand: JukeCommand<YesNoArgs> = {
             return { say: i18n('juke.reply.duplicate.children', flow.label) };
         }
         const includeChildren = answer.kind === 'yes';
+        // Duplicates appear next to their originals in the tree, so leave the
+        // filtered list first and expand the originals' parent afterwards.
+        await leaveFilterMode();
         const ok = await runTask(
             duplicateContent(flow.items.map((item) => ({ contentId: item.getContentId(), includeChildren }))),
         );
         if (!ok) {
             return finished(i18n('juke.reply.action.failed'));
         }
+        await expandInTree(flow.items[0].getPath().getParentPath());
         return finished(
             includeChildren
                 ? i18n('juke.reply.duplicate.doneWith', flow.label)
