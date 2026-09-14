@@ -195,7 +195,8 @@ Behaviour:
 - Replies are spoken one at a time through a queue. Recognition keeps running while Juke speaks (pausing it lost
   quick answers in the recognizer's restart gap); transcripts finalized while speaking or within 1 s after,
   and transcripts that are a contiguous piece of one of the last three replies, or (3+ words) at least 80 %
-  made of one reply's words (`speech/echo.ts`; Chrome may finalize an echo only after the next reply started),
+  made of one reply's words, compared by a sound key (number words as digits, consonant skeletons) so "hear"
+  matches "here" and "one" matches "1" (`speech/echo.ts`; Chrome may finalize an echo only after the next reply started),
   are dropped as Juke's own echo. When no pause separates the reply and the answer, Chrome merges them into one
   transcript; a leading run of 2+ words that is the in-order ending of a recent reply is stripped and the
   remainder is the answer. Stripping never removes words merely reused by the user (bug 2026-09-14: a union
@@ -295,7 +296,7 @@ Phrases:
 - `juke.reply.search.start=What are you looking for?`
 - `juke.reply.search.none=I couldn't find any content items matching your criteria. Try a different search.`
 - `juke.reply.search.found=I found {0} content items matching your criteria. Do you want to see them?`
-- `juke.reply.search.showing=Here they are. {0} items.` / `juke.reply.search.dismissed=Okay.`
+- `juke.reply.search.showing=Here they are. {0} items.` / `juke.reply.search.showingOne=Here it is.` / `juke.reply.search.dismissed=Okay.`
 - `juke.reply.search.typeNotFound`, `juke.reply.search.userNotFound`
 - `juke.reply.tree.expanding=Expanding {0}`
 - `juke.reply.tree.collapsing=Collapsing {0}`

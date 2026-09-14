@@ -257,7 +257,11 @@ export const searchShowCommand: JukeCommand<ShowAnswer> = {
             return { say: i18n('juke.reply.search.dismissed'), prompt: null };
         }
         applySearchToFilterPanel(criteria);
-        return { say: i18n('juke.reply.search.showing', criteria.hits ?? 0), prompt: null };
+        const hits = criteria.hits ?? 0;
+        return {
+            say: hits === 1 ? i18n('juke.reply.search.showingOne') : i18n('juke.reply.search.showing', hits),
+            prompt: null,
+        };
     },
 };
 
