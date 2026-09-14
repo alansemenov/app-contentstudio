@@ -302,7 +302,9 @@ Search acceptance:
 - "New search" resets the filter (if applied), enters the `search` prompt and speaks the start reply.
 - In `search`, each utterance is parsed left to right into criteria; several may appear in one utterance:
   `content type <x>`, `last modified by me|<user>`, `last modified today`, `last modified this week`,
-  `in progress`. Anything else becomes free-text keywords.
+  `in progress` ("last" also accepted as "lost"/"life"/"less", "modified" as "modify"). An utterance with
+  any clause is a filter command and words around the clauses are dropped as recognition noise; only a
+  clause-free utterance is free text. Content types and modifiers are de-duplicated by key.
 - After each utterance Juke builds the same `SearchInputValues` the filter panel builds from its state
   (`commands/search-query.ts`: keywords as text, `AggregationSelection`s for content types, modifier, a
   `DateRangeBucket` for last modified, `in_progress` workflow bucket) and runs the panel's own

@@ -81,13 +81,21 @@ describe('parseCriteria', () => {
         });
     });
 
-    it('should keep leading keywords and text after flag clauses as keywords', () => {
+    it('should treat words around clauses as noise, not keywords', () => {
         expect(parseCriteria('summer content type post in progress news')).toEqual({
-            keywords: ['summer', 'news'],
+            keywords: [],
             contentTypes: ['post'],
             modifiedBy: [],
             inProgress: true,
         });
+        expect(parseCriteria('life modified by me')).toEqual({
+            keywords: [],
+            contentTypes: [],
+            modifiedBy: ['me'],
+            inProgress: false,
+        });
+        expect(parseCriteria('lost modified this week').lastModified).toBe('week');
+        expect(parseCriteria('modify today').lastModified).toBe('day');
         expect(parseCriteria('last modified today')).toEqual({
             keywords: [],
             contentTypes: [],
@@ -147,7 +155,8 @@ describe('search dialog', () => {
     it('should resolve criteria, count hits and offer to show them', async () => {
         await say('new search');
 
-        const reply = await say('content type post last modified this week in progress summer', 'search');
+        await say('summer', 'search');
+        const reply = await say('content type post last modified this week in progress', 'search');
 
         expect(mocks.runSearch).toHaveBeenLastCalledWith({
             keywords: ['summer'],
@@ -172,6 +181,13 @@ describe('search dialog', () => {
         await say('last modified by anna', 'search');
         const lastCall = mocks.runSearch.mock.calls.at(-1)![0];
         expect(lastCall.modifiers.map((m: { key: string }) => m.key)).toEqual(['user:system:su', 'user:system:anna']);
+
+        await say('last modified by me', 'search');
+        const afterRepeat = mocks.runSearch.mock.calls.at(-1)![0];
+        expect(afterRepeat.modifiers.map((m: { key: string }) => m.key)).toEqual([
+            'user:system:su',
+            'user:system:anna',
+        ]);
     });
 
     it('should keep the search open when a type or user is unknown or nothing is found', async () => {
@@ -189,7 +205,8 @@ describe('search dialog', () => {
         await say('new search');
         await say('content type post', 'search');
         await say('summer', 'search');
-        await say('winter in progress', 'search');
+        await say('winter', 'search');
+        await say('in progress', 'search');
 
         expect(mocks.runSearch).toHaveBeenLastCalledWith(
             expect.objectContaining({

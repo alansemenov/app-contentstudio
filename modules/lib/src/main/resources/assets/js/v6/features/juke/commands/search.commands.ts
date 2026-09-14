@@ -49,8 +49,23 @@ const START_PATTERN =
 const RESTART_PATTERN = /^(?:lets|let us)?\s*(?:try again|start over|start again|restart)$/;
 const YES_PATTERN = /^(?:yes|yeah|yep|sure|please|ok|okay|show me|show them|yes please|show)$/;
 
-const CLAUSE_PATTERN =
-    /\b(content type|last modified by|modified by|last modified today|modified today|last modified this week|modified this week|in progress)\b/g;
+// "last" is often heard as "life", "lost" or "less"; "modified" sometimes as "modify".
+const LAST = '(?:last|lost|life|less|lust)';
+const MODIFIED = 'modif(?:ied|y|ies)';
+const CLAUSE_PATTERN = new RegExp(
+    `\\b(content type|(?:${LAST}\\s+)?${MODIFIED}\\s+by|(?:${LAST}\\s+)?${MODIFIED}\\s+today|(?:${LAST}\\s+)?${MODIFIED}\\s+this week|in progress)\\b`,
+    'g',
+);
+
+type ClauseKind = 'contentType' | 'modifiedBy' | 'modifiedToday' | 'modifiedThisWeek' | 'inProgress';
+
+function clauseKind(keyword: string): ClauseKind {
+    if (keyword === 'content type') return 'contentType';
+    if (keyword === 'in progress') return 'inProgress';
+    if (keyword.endsWith(' by')) return 'modifiedBy';
+    if (keyword.endsWith(' today')) return 'modifiedToday';
+    return 'modifiedThisWeek';
+}
 
 type Clause = { keyword: string; value: string };
 
@@ -68,34 +83,34 @@ function splitClauses(text: string): { leading: string; clauses: Clause[] } {
     return { leading, clauses };
 }
 
+// An utterance with filter clauses is a filter command: words around the
+// clauses are recognition noise ("life modified by me"), not keywords. Only a
+// clause-free utterance is free text.
 export function parseCriteria(text: string): ParsedCriteria {
     const parsed: ParsedCriteria = { keywords: [], contentTypes: [], modifiedBy: [], inProgress: false };
     const { leading, clauses } = splitClauses(text);
-    if (leading.length > 0) {
-        parsed.keywords.push(leading);
+    if (clauses.length === 0) {
+        if (leading.length > 0) {
+            parsed.keywords.push(leading);
+        }
+        return parsed;
     }
     clauses.forEach(({ keyword, value }) => {
-        switch (keyword) {
-            case 'content type':
+        switch (clauseKind(keyword)) {
+            case 'contentType':
                 if (value) parsed.contentTypes.push(value);
                 break;
-            case 'last modified by':
-            case 'modified by':
+            case 'modifiedBy':
                 if (value) parsed.modifiedBy.push(value);
                 break;
-            case 'last modified today':
-            case 'modified today':
+            case 'modifiedToday':
                 parsed.lastModified = 'day';
-                if (value) parsed.keywords.push(value);
                 break;
-            case 'last modified this week':
-            case 'modified this week':
+            case 'modifiedThisWeek':
                 parsed.lastModified = 'week';
-                if (value) parsed.keywords.push(value);
                 break;
-            case 'in progress':
+            case 'inProgress':
                 parsed.inProgress = true;
-                if (value) parsed.keywords.push(value);
                 break;
         }
     });
@@ -172,7 +187,19 @@ async function resolveCriteria(base: SearchCriteria, parsed: ParsedCriteria): Pr
         }
     }
 
+    criteria.contentTypes = uniqueBy(criteria.contentTypes, (type) => type.key);
+    criteria.modifiers = uniqueBy(criteria.modifiers, (modifier) => modifier.key);
     return { criteria };
+}
+
+function uniqueBy<T>(items: readonly T[], key: (item: T) => string): T[] {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+        const k = key(item);
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+    });
 }
 
 // Accepted in every prompt so "new search" always resets and starts afresh,
