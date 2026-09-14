@@ -250,6 +250,7 @@ describe('toolbar actions', () => {
         expect(mocks.leaveFilterMode).toHaveBeenCalledTimes(1);
         expect(mocks.expandInTree).toHaveBeenCalledWith(blogs.getPath());
         expect(mocks.showSuccess).toHaveBeenCalledWith('notify.items.moved.to.single|1 /superhero/blogs');
+        expect(mocks.showSuccess).toHaveBeenCalledWith('notify.items.moved.to.single|1 /superhero/blogs');
     });
 
     it('should exclude the moved items and their descendants as destinations', async () => {
@@ -271,6 +272,7 @@ describe('toolbar actions', () => {
             prompt: null,
         });
         expect(mocks.moveContent).toHaveBeenCalledWith([post.getContentId()], undefined);
+        expect(mocks.showSuccess).toHaveBeenCalledWith('notify.items.moved.to.single|1 field.root');
         expect(mocks.showSuccess).toHaveBeenCalledWith('notify.items.moved.to.single|1 field.root');
 
         await say('move summer news');
@@ -298,6 +300,9 @@ describe('toolbar actions', () => {
         expect(mocks.duplicateContent).toHaveBeenCalledWith([
             { contentId: post.getContentId(), includeChildren: true },
         ]);
+        expect(mocks.leaveFilterMode).toHaveBeenCalledTimes(1);
+        expect(mocks.expandInTree).toHaveBeenCalledWith(post.getPath().getParentPath());
+        expect(mocks.showSuccess).toHaveBeenCalledWith('dialog.duplicate.success.single|Summer news');
 
         await say('duplicate summer news');
         expect(await say('no', 'duplicateChildren')).toEqual({

@@ -387,7 +387,9 @@ Acceptance:
   alternative are tried in order. State between question and answer lives in `model/actionFlow.store.ts`.
 - The delete, move and duplicate REST wrappers moved from `features/*/api` to `entities/content/api` (re-export
   shims left in place) so `features/juke` can call them within the boundary rules. Each returns a task id; Juke
-  waits for the task with `trackTask` and answers done or `action.failed`.
+  waits for the task with `trackTask` and answers done or `action.failed`, and shows the same success or error
+  toast the corresponding dialog shows (`dialog.archive.success.*`, `notify.items.moved.to.*` + destination,
+  `dialog.duplicate.success.*`, `notify.process.failed`).
 - Edit: one edit tab per resolved item via `ContentUrlHelper.openEditContentTab`; reply names the item or the
   count.
 - Delete: confirmation prompt with display name or count → `confirmDelete`. Only an explicit "yes" (also "go
