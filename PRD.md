@@ -305,8 +305,9 @@ Search acceptance:
   `ContentAggregationsFetcher.getAggregations()`; the total is the hit count. "Found" enters `showResults`;
   zero hits keeps the `search` prompt open so the criteria can be refined. Filter criteria accumulate across
   utterances; free-text keywords are replaced by each utterance so a misheard phrase does not stick. "New
-  search" is accepted inside the `search` and `showResults` prompts too and always starts afresh (bug found
-  2026-09-14: it used to become keywords, leaving the user stuck with zero hits). Content type names resolve against `schema/content/all` titles; "me" resolves to
+  search" (also "start a new search", "search again", "another search", "reset the search", and "surge" as
+  recognition often hears it) is accepted in every prompt, resets the filter and any open create/search state,
+  and starts afresh (bug found 2026-09-14: it used to become keywords, leaving the user stuck with zero hits). Content type names resolve against `schema/content/all` titles; "me" resolves to
   `config.user`; other user names resolve against the modifier buckets of the current search, mapped to display
   names through `getPrincipalsByKeys`. Unknown type or user: matching reply, prompt stays.
 - "Yes" to `showResults` opens the filter panel, writes value and selection into `$contentFilterState`, so the

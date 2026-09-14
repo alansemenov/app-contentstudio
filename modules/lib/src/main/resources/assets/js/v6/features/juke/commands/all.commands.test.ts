@@ -34,7 +34,8 @@ describe('allCommands registration order', () => {
         expect(resolveCommand(['content type post'], context('search'))?.command.id).toBe('search.criteria');
         expect(resolveCommand(['yes'], context('showResults'))?.command.id).toBe('search.show');
         expect(resolveCommand(['under blogs'], context('createParent'))?.command.id).toBe('content.create.parent');
-        expect(resolveCommand(['new search'], context('createName'))?.command.id).toBe('content.create.name');
+        expect(resolveCommand(['new search'], context('createName'))?.command.id).toBe('search.start');
+        expect(resolveCommand(['summer news'], context('createName'))?.command.id).toBe('content.create.name');
         expect(resolveCommand(['cancel'], context('createName'))?.command.id).toBe('session.cancel');
     });
 

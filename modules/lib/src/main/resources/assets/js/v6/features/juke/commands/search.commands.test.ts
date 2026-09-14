@@ -209,6 +209,25 @@ describe('search dialog', () => {
 
         await say('content type post', 'search');
         expect(await say('new search', 'showResults')).toEqual({ say: 'juke.reply.search.start', prompt: 'search' });
+        expect(await say('new search', 'createName')).toEqual({ say: 'juke.reply.search.start', prompt: 'search' });
+    });
+
+    it.each([
+        'new search',
+        'a new search',
+        'start a new search',
+        'lets do a new search',
+        'search again',
+        'another search',
+        'reset the search',
+        'new surge',
+        'search',
+    ])('should start on "%s"', (text) => {
+        expect(resolveCommand([text], context())?.command.id).toBe('search.start');
+    });
+
+    it('should not start on phrases merely containing search', () => {
+        expect(resolveCommand(['search for summer'], context())).toBeNull();
     });
 
     it('should apply the criteria to the filter panel on yes and dismiss otherwise', async () => {

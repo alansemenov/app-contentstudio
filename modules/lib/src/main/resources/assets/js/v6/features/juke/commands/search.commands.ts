@@ -2,6 +2,7 @@ import { i18n } from '@enonic/lib-admin-ui/util/Messages';
 import { fetchAllContentTypes } from '../../../entities/schema/api/contentTypes.api';
 import { $config } from '../../../shared/config/config.store';
 import { resetContentFilter } from '../../../shared/app-state/contentFilter.store';
+import { resetCreateFlow } from '../model/createFlow.store';
 import {
     $searchFlow,
     emptySearchCriteria,
@@ -41,7 +42,10 @@ export type ParsedCriteria = {
 export type SearchAnswer = { kind: 'restart' } | { kind: 'criteria'; parsed: ParsedCriteria };
 export type ShowAnswer = { kind: 'yes' } | { kind: 'no' };
 
-const START_PATTERN = /^(?:(?:start\s+)?(?:a\s+)?new\s+search|start\s+(?:a\s+)?search|search)$/;
+// "new search", "start a new search", "let's do a new search", "search again", "another search",
+// "reset the search", plus "surge", which is how recognition often hears "search".
+const START_PATTERN =
+    /^(?:(?:lets|let us|please)\s+)?(?:(?:do|start|make|begin|run)\s+)?(?:a\s+|another\s+)?(?:new\s+)?(?:search|surge)(?:\s+again)?$|^(?:reset|restart|clear)\s+(?:the\s+)?search$/;
 const RESTART_PATTERN = /^(?:lets|let us)?\s*(?:try again|start over|start again|restart)$/;
 const YES_PATTERN = /^(?:yes|yeah|yep|sure|please|ok|okay|show me|show them|yes please|show)$/;
 
@@ -171,15 +175,15 @@ async function resolveCriteria(base: SearchCriteria, parsed: ParsedCriteria): Pr
     return { criteria };
 }
 
-// Also accepted while a search is open so "new search" always starts afresh
-// instead of being taken for keywords.
+// Accepted in every prompt so "new search" always resets and starts afresh,
+// whatever question was open.
 export const searchStartCommand: JukeCommand<true> = {
     id: 'search.start',
     modes: ['dialog'],
-    prompts: [null, 'search', 'showResults'],
     match: (text) => (START_PATTERN.test(text) ? true : null),
     run: () => {
         resetContentFilter();
+        resetCreateFlow();
         startSearchFlow();
         return { say: i18n('juke.reply.search.start'), prompt: 'search' };
     },
