@@ -7,7 +7,7 @@ import type { JukeContext, JukeReply } from './command.types';
 import { sessionCommands } from './session.commands';
 import { parseMoveTarget, parseToolbar, parseYesNo, toolbarCommands } from './toolbar.commands';
 
-const { mocks } = vi.hoisted(() => ({
+const { mocks, filter } = vi.hoisted(() => ({
     mocks: {
         resolveTarget: vi.fn(),
         openEditContentTab: vi.fn(),
@@ -18,7 +18,9 @@ const { mocks } = vi.hoisted(() => ({
         trackTask: vi.fn(),
         findContentByName: vi.fn(),
         revealContentByPath: vi.fn(),
+        resetContentFilter: vi.fn(),
     },
+    filter: { active: false, listeners: [] as ((active: boolean) => void)[] },
 }));
 
 vi.mock('@enonic/lib-admin-ui/util/Messages', () => ({
@@ -44,7 +46,19 @@ vi.mock('../../../entities/content/api/delete.api', () => ({ archiveContent: moc
 vi.mock('../../../entities/content/api/move.api', () => ({ moveContent: mocks.moveContent }));
 vi.mock('../../../entities/content/api/duplicate.api', () => ({ duplicateContent: mocks.duplicateContent }));
 vi.mock('../../../entities/task/task.service', () => ({ trackTask: mocks.trackTask }));
-vi.mock('../../../entities/content', () => ({ revealContentByPath: mocks.revealContentByPath }));
+vi.mock('../../../entities/content', () => ({
+    revealContentByPath: mocks.revealContentByPath,
+    $isFilterActive: {
+        get: () => filter.active,
+        subscribe: (listener: (active: boolean) => void) => {
+            filter.listeners.push(listener);
+            return () => {
+                filter.listeners = filter.listeners.filter((l) => l !== listener);
+            };
+        },
+    },
+}));
+vi.mock('../../../shared/app-state/contentFilter.store', () => ({ resetContentFilter: mocks.resetContentFilter }));
 vi.mock('./content-lookup', () => ({
     findContentByName: mocks.findContentByName,
     canHoldChildren: () => true,
@@ -145,6 +159,8 @@ describe('toolbar actions', () => {
         });
         mocks.findContentByName.mockResolvedValue({ kind: 'match', value: blogs });
         mocks.revealContentByPath.mockResolvedValue(undefined);
+        filter.active = false;
+        filter.listeners = [];
     });
 
     it('should pass the target specs from every alternative to the resolver', async () => {
@@ -230,6 +246,26 @@ describe('toolbar actions', () => {
             select: false,
             expandTarget: true,
         });
+    });
+
+    it('should clear an active filter and wait for the tree before expanding the destination', async () => {
+        filter.active = true;
+        mocks.resetContentFilter.mockImplementation(() => {
+            queueMicrotask(() => {
+                filter.active = false;
+                filter.listeners.forEach((listener) => listener(false));
+            });
+        });
+        await say('move summer news');
+
+        const reply = await say('under blogs', 'moveTarget');
+
+        expect(mocks.resetContentFilter).toHaveBeenCalledTimes(1);
+        expect(mocks.revealContentByPath).toHaveBeenCalledWith('/superhero/blogs', {
+            select: false,
+            expandTarget: true,
+        });
+        expect(reply).toEqual({ say: 'juke.reply.move.done|Summer news|Blogs', prompt: null });
     });
 
     it('should exclude the moved items and their descendants as destinations', async () => {

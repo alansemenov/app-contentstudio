@@ -81,7 +81,12 @@ async function resolveOne(spec: TargetSpec): Promise<TargetResolution> {
     switch (spec.kind) {
         case 'implicit': {
             const current = [...getCurrentItems()];
-            return current.length > 0 ? items(current) : reply(i18n('juke.reply.target.noSelection'));
+            if (current.length > 0) {
+                return items(current);
+            }
+            // With a single row on screen "it" can only mean that row.
+            const visible = visibleItems();
+            return visible.length === 1 ? items(visible) : reply(i18n('juke.reply.target.noSelection'));
         }
         case 'all': {
             const visible = visibleItems();

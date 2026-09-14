@@ -352,7 +352,7 @@ is one of:
 |---|---|---|
 | Position | "the top one", "the first one", "the third one", "the last one", "the bottom one", "the second one from the bottom", "number three" | The nth row of the list as displayed (`$activeFlatNodes`: expanded main tree, or the filtered list when a filter is active). Ordinals up to tenth and digits. |
 | Name | "edit summer news", "delete the superhero site" | First a unique `bestUniqueMatch` over the visible rows' display names; if nothing is visible by that name, `findContentByName` project-wide. Ambiguity is reported. |
-| Implicit | "delete it", "preview them", "edit the selected", bare "edit" | The current selection, else the highlighted row (`getCurrentItems()`). None → no-target reply. |
+| Implicit | "delete it", "preview them", "edit the selected", bare "edit" | The current selection, else the highlighted row (`getCurrentItems()`), else the only visible row when the list shows exactly one. None → no-target reply. |
 | All | "preview all", "edit all" | Every visible row. Allowed for preview and edit; delete and duplicate go through their confirmation with the count. Move all is not supported. |
 
 Single target per command; multi-target lists ("the first three", "news and sport") are out of scope.
@@ -395,7 +395,8 @@ Acceptance:
   resolved items, not the selection.
 - Move: "Where do you want to move <name>?" → `moveTarget`. The answer is a new-parent name resolved with
   `findContentByName` + `canHoldChildren`, excluding the moved items and their descendants ("to the root" moves
-  to the root); a unique match moves the items with `moveContent`, then expands the destination in the tree
+  to the root); a unique match moves the items with `moveContent`, then — if a filter is active — resets the filter
+  and waits for the tree to return (`$isFilterActive`, 3 s timeout) — and expands the destination in the tree
   (`revealContentByPath` with `select: false, expandTarget: true`) and speaks done; not found / ambiguous keep
   the prompt; "cancel" cancels. "Move all" is refused.
 - Duplicate: children question → `duplicateChildren`. "Yes"/"no" duplicates with or without children via

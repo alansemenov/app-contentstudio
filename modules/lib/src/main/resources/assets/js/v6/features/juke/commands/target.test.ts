@@ -130,6 +130,10 @@ describe('resolveTarget', () => {
             reply: { say: 'juke.reply.target.noSelection' },
         });
 
+        mocks.getVisibleNodes.mockReturnValue([node(posts)]);
+        expect(await resolveTarget([parseTarget('it')])).toMatchObject({ items: [posts] });
+        mocks.getVisibleNodes.mockReturnValue([node(superhero), node(posts), node(about)]);
+
         mocks.getCurrentItems.mockReturnValue([posts, about]);
         expect(await resolveTarget([parseTarget('them')])).toEqual({
             kind: 'items',
