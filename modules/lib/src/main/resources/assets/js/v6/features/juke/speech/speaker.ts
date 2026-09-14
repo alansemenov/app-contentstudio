@@ -7,8 +7,8 @@ import { getSynthesis } from './support';
 // Chrome, so the pick is re-evaluated on every utterance until a voice is found.
 //
 
-export const JUKE_VOICE_NAME = 'Google UK English Male';
-export const JUKE_VOICE_LANG = 'en-GB';
+export const JUKE_VOICE_NAME = 'Google US English';
+export const JUKE_VOICE_LANG = 'en-US';
 
 export type SpeakerOptions = {
     synth?: SpeechSynthesis | null;
@@ -21,7 +21,7 @@ export type Speaker = {
     cancel(): void;
 };
 
-// Preferred voice by name, then any British English voice, then any English voice.
+// Preferred voice by name, then any US English voice, then any English voice.
 export function pickVoice(voices: readonly SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
     return (
         voices.find((voice) => voice.name === JUKE_VOICE_NAME) ??

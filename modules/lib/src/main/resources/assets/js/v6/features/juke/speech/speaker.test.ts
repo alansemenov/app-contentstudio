@@ -20,13 +20,13 @@ class FakeUtterance {
 
 describe('pickVoice', () => {
     it('prefers the Juke voice by name', () => {
-        const voices = [voice('Samantha', 'en-US'), voice('Daniel', 'en-GB'), voice(JUKE_VOICE_NAME, 'en-GB')];
+        const voices = [voice('Samantha', 'en-US'), voice('Daniel', 'en-GB'), voice(JUKE_VOICE_NAME, 'en-US')];
         expect(pickVoice(voices)?.name).toBe(JUKE_VOICE_NAME);
     });
 
-    it('falls back to British English, then any English', () => {
-        expect(pickVoice([voice('Samantha', 'en-US'), voice('Daniel', 'en-GB')])?.name).toBe('Daniel');
-        expect(pickVoice([voice('Nora', 'nb-NO'), voice('Samantha', 'en_US')])?.name).toBe('Samantha');
+    it('falls back to US English, then any English', () => {
+        expect(pickVoice([voice('Daniel', 'en-GB'), voice('Samantha', 'en-US')])?.name).toBe('Samantha');
+        expect(pickVoice([voice('Nora', 'nb-NO'), voice('Daniel', 'en-GB')])?.name).toBe('Daniel');
     });
 
     it('returns null when no English voice exists', () => {
@@ -39,7 +39,7 @@ describe('createSpeaker', () => {
     const spoken: FakeUtterance[] = [];
     const synth = {
         cancel: vi.fn(),
-        getVoices: vi.fn(() => [voice('Daniel', 'en-GB'), voice(JUKE_VOICE_NAME, 'en-GB')]),
+        getVoices: vi.fn(() => [voice('Daniel', 'en-GB'), voice(JUKE_VOICE_NAME, 'en-US')]),
         speak: vi.fn((utterance: FakeUtterance) => {
             spoken.push(utterance);
         }),
@@ -72,7 +72,7 @@ describe('createSpeaker', () => {
         expect(spoken).toHaveLength(1);
         expect(spoken[0].text).toBe('Hello, Alan.');
         expect(spoken[0].voice?.name).toBe(JUKE_VOICE_NAME);
-        expect(spoken[0].lang).toBe('en-GB');
+        expect(spoken[0].lang).toBe('en-US');
 
         spoken[0].onend?.();
         await Promise.resolve();
@@ -101,9 +101,9 @@ describe('createSpeaker', () => {
 
         void speaker.speak('first');
         expect(spoken[0].voice).toBeNull();
-        expect(spoken[0].lang).toBe('en-GB');
+        expect(spoken[0].lang).toBe('en-US');
 
-        vi.mocked(emptySynth.getVoices).mockReturnValue([voice(JUKE_VOICE_NAME, 'en-GB')]);
+        vi.mocked(emptySynth.getVoices).mockReturnValue([voice(JUKE_VOICE_NAME, 'en-US')]);
         void speaker.speak('second');
         expect(spoken[1].voice?.name).toBe(JUKE_VOICE_NAME);
     });

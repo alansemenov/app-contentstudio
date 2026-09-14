@@ -25,7 +25,7 @@ is not used functionally, only as a gate.
 | Icon | Reuse `v6/shared/ui/icons/JukeIcon.tsx` | Same branding as the operator toggle in the wizard toolbar. |
 | Icon animations | Accepting commands: "breathe" (slow scale 1→1.06 with a green glow and a faint ring, 2.6 s loop). Answering: "bars" (four-bar equalizer pill to the left of the icon, icon bobs). Glow color is theme-aware: deep green on light, pale mint `#a2ffbd` on dark. Icon size 64 px, fixed bottom-right. | Chosen by the user on 2026-09-10 in the voice picker; pale mint alone was invisible on the light theme. |
 | Language | English only (`en-US`) for recognition and synthesis. | Spec phrases are English; can be made configurable later. |
-| Voice | `speechSynthesis` voice "Google UK English Male" (`en-GB`, online). Fallback: first `en-GB` voice, then first `en` voice. Rate and pitch 1.0 unless tuned later. | Chosen by the user on 2026-09-10 with the voice picker. |
+| Voice | `speechSynthesis` voice "Google US English" (`en-US`, online). Fallback: first `en-US` voice, then first `en` voice. Rate and pitch 1.0 unless tuned later. Recognition has always been `en-US`. | Chosen "Google UK English Male" on 2026-09-10; switched to the US voice on 2026-09-14 at the user's request. Chrome ships no Google US English male voice, so this one is female. |
 | Delivery | Feature branch `juke-voice` off `master`, one or a few commits per milestone. Jar renamed to `hackathon.jar` (done). | User choice. |
 | Code location | All new code under `modules/lib/src/main/resources/assets/js/v6/features/juke/` (Preact, strict TS, Tailwind, nanostores). Legacy `app/` is called into, never extended. | Project CLAUDE.md. |
 | Localization | All spoken and displayed strings in `phrases.properties` under `juke.*` keys. | Project convention. |
@@ -194,7 +194,7 @@ Behaviour:
   after the utterance ends, so Juke never transcribes itself. A command that throws or takes longer than 20 s
   gets `juke.reply.failed` spoken and logged, so Juke never falls silent. Every recognized phrase and the
   resolved command id are logged with `console.info('[juke] heard', ...)` for diagnosis.
-- Voice: "Google UK English Male", falling back to the first `en-GB` voice, then the first `en` voice. Rate and
+- Voice: "Google US English", falling back to the first `en-US` voice, then the first `en` voice. Rate and
   pitch 1.0. Utterances resolve on `end`, `error`, or a safety timeout of max(3 s, 120 ms per character).
 - Recognizer: continuous, final results only, 3 alternatives, `en-US`. Restarts on every `end` while active;
   backs off 1 s → 10 s after `network`/`audio-capture` errors, resets after a result; stops for good on
