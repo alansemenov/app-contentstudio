@@ -236,6 +236,10 @@ Phrases:
 - `juke.reply.create.failed=I could not create a new {0}. Please try again.`
 
 Behaviour:
+- Recognition alternatives: the service puts every normalized alternative into `JukeContext.alternatives`.
+  Name lookups (tree expand/collapse, project switch, create type and parent) try the name from each
+  alternative in order until one resolves (`parseAlternatives`), because the alternative that matched the
+  command pattern may carry a misheard name ("expand both" with "expand posts" as second guess).
 - Matching (`commands/matching.ts`, `bestUniqueMatch`): labels and the spoken name are normalized; tiers are
   tried in order — exact, label starts with spoken, containment either way, every spoken word in the label —
   and the first tier with hits decides. More than one hit is ambiguous and reported as not found.

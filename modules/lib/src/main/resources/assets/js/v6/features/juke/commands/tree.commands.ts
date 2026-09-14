@@ -14,7 +14,7 @@ import {
 import { type ContentData, isFlatTreeItemContentData } from '../../../entities/content/model/ContentData';
 import type { FlatNode } from '../../../shared/lib/tree-store';
 import type { JukeCommand } from './command.types';
-import { bestUniqueMatch } from './matching';
+import { bestUniqueMatch, parseAlternatives } from './matching';
 
 //
 // * Tree commands
@@ -86,13 +86,26 @@ export const treeCommand: JukeCommand<TreeArgs> = {
     modes: ['dialog'],
     prompts: [null],
     match: (text) => parseTreeCommand(text),
-    run: ({ action, name }) => {
-        const result = findVisibleNode(getVisibleNodes(), name);
-        if (result.kind === 'none') {
+    run: ({ action, name }, context) => {
+        // Recognition may hear the name wrong in its best guess ("expand both" for
+        // "expand posts"); try the name from every alternative with the same action.
+        const nodes = getVisibleNodes();
+        const names = parseAlternatives(context.alternatives, `${action} ${name}`, (text) => {
+            const parsed = parseTreeCommand(text);
+            return parsed?.action === action ? parsed.name : null;
+        });
+        const results = names.map((candidate) => ({ candidate, result: findVisibleNode(nodes, candidate) }));
+        const found = results.find(({ result }) => result.kind === 'match');
+        if (found == null) {
+            const ambiguous = results.find(({ result }) => result.kind === 'ambiguous');
+            if (ambiguous != null) {
+                return { say: i18n('juke.reply.tree.ambiguous', ambiguous.candidate) };
+            }
             return { say: i18n('juke.reply.tree.notVisible', name) };
         }
-        if (result.kind === 'ambiguous') {
-            return { say: i18n('juke.reply.tree.ambiguous', name) };
+        const result = found.result;
+        if (result.kind !== 'match') {
+            return { say: i18n('juke.reply.tree.notVisible', name) };
         }
 
         const node = result.value;

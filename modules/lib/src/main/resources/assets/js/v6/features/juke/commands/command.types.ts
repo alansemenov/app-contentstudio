@@ -22,6 +22,10 @@ export type JukeContext = {
     mode: JukeMode;
     prompt: JukePrompt | null;
     userName: string;
+    // Every recognition alternative for the utterance, best first, normalized.
+    // Commands that look a name up should try each until one resolves, since
+    // the alternative that matched the pattern may carry a misheard name.
+    alternatives?: readonly string[];
 };
 
 export type JukeReply = {

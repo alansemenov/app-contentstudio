@@ -141,6 +141,7 @@ const handleTranscripts = (alternatives: string[]): void => {
     }
 
     const candidates = context.mode === 'dialog' ? normalized.map(stripJukeAddress) : normalized;
+    context.alternatives = candidates;
     const resolved = resolveCommand(candidates, context);
     console.info(
         '[juke] heard',

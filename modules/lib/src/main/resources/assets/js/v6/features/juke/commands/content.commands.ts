@@ -24,7 +24,7 @@ import {
 } from '../model/createFlow.store';
 import type { JukeCommand, JukeReply } from './command.types';
 import { canHoldChildren, findContentByName } from './content-lookup';
-import { bestUniqueMatch } from './matching';
+import { bestUniqueMatch, parseAlternatives } from './matching';
 
 //
 // * Content creation dialog
@@ -152,8 +152,14 @@ export const createStartCommand: JukeCommand<CreateStartArgs> = {
     modes: ['dialog'],
     prompts: [null],
     match: (text) => parseCreateStart(text),
-    run: async ({ typeName }) => {
-        const type = findContentType(await fetchCreatableTypes(), typeName);
+    run: async ({ typeName }, context) => {
+        const types = await fetchCreatableTypes();
+        const names = parseAlternatives(
+            context.alternatives,
+            `create a ${typeName}`,
+            (text) => parseCreateStart(text)?.typeName ?? null,
+        );
+        const type = names.map((candidate) => findContentType(types, candidate)).find((found) => found != null) ?? null;
         if (type == null) {
             return { say: i18n('juke.reply.create.typeNotFound', typeName) };
         }
@@ -167,7 +173,7 @@ export const createParentCommand: JukeCommand<CreateParentArgs> = {
     modes: ['dialog'],
     prompts: ['createParent'],
     match: (text) => parseCreateParent(text),
-    run: async (args) => {
+    run: async (args, context) => {
         const flow = $createFlow.get();
         if (args.kind === 'restart' || flow == null) {
             return restarted();
@@ -176,14 +182,26 @@ export const createParentCommand: JukeCommand<CreateParentArgs> = {
 
         let parent: ContentSummary | undefined;
         if (args.kind === 'named') {
-            const result = await findContentByName(args.name, { accept: canHoldChildren });
-            if (result.kind === 'none') {
-                return { say: i18n('juke.reply.create.parentNotFound', args.name) };
+            const names = parseAlternatives(context.alternatives, args.name, (text) => {
+                const parsed = parseCreateParent(text);
+                return parsed.kind === 'named' ? parsed.name : null;
+            });
+            let ambiguous: string | null = null;
+            for (const candidate of names) {
+                const result = await findContentByName(candidate, { accept: canHoldChildren });
+                if (result.kind === 'match') {
+                    parent = result.value;
+                    break;
+                }
+                if (result.kind === 'ambiguous' && ambiguous == null) {
+                    ambiguous = candidate;
+                }
             }
-            if (result.kind === 'ambiguous') {
-                return { say: i18n('juke.reply.create.parentAmbiguous', args.name) };
+            if (parent == null) {
+                return ambiguous != null
+                    ? { say: i18n('juke.reply.create.parentAmbiguous', ambiguous) }
+                    : { say: i18n('juke.reply.create.parentNotFound', args.name) };
             }
-            parent = result.value;
         }
 
         if (!(await isTypeAllowedUnder(flow.type, parent))) {

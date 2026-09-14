@@ -145,6 +145,17 @@ describe('treeCommand', () => {
         expect(mocks.collapseNode).not.toHaveBeenCalled();
     });
 
+    it('should try the name from every recognition alternative', async () => {
+        const alternatives = ['expand both', 'expand posts', 'expand post'];
+        state.nodes = [node('posts', 'Posts'), node('site', 'Superhero')];
+        const ctx: JukeContext = { ...context, alternatives };
+
+        const reply = await treeCommand.run(treeCommand.match(alternatives[0], ctx)!, ctx);
+
+        expect(mocks.expandNode).toHaveBeenCalledWith('posts');
+        expect(reply).toEqual({ say: 'juke.reply.tree.expanding|Posts' });
+    });
+
     it('should only run in dialog mode without a pending prompt', () => {
         expect(treeCommand.modes).toEqual(['dialog']);
         expect(treeCommand.prompts).toEqual([null]);

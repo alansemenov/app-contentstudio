@@ -78,6 +78,14 @@ describe('goToProjectCommand', () => {
         expect(reply).toEqual({ say: 'juke.reply.project.notFound|marketing' });
     });
 
+    it('should try the project name from every recognition alternative', async () => {
+        const ctx: JukeContext = { ...context, alternatives: ['go to super zero', 'go to superhero'] };
+        const reply = await goToProjectCommand.run(goToProjectCommand.match('go to super zero', ctx)!, ctx);
+
+        expect(mockSelectProject).toHaveBeenCalledWith(projects[1]);
+        expect(reply).toEqual({ say: 'juke.reply.project.switching|Superhero' });
+    });
+
     it('should only be available in dialog mode', () => {
         expect(goToProjectCommand.modes).toEqual(['dialog']);
     });

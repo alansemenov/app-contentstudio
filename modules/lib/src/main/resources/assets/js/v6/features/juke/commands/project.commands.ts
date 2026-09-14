@@ -2,7 +2,7 @@ import { i18n } from '@enonic/lib-admin-ui/util/Messages';
 import type { Project } from '../../../../app/settings/data/project/Project';
 import { $projects, selectProject } from '../../../entities/project';
 import type { JukeCommand } from './command.types';
-import { bestUniqueMatch } from './matching';
+import { bestUniqueMatch, parseAlternatives } from './matching';
 
 //
 // * Project commands
@@ -33,8 +33,11 @@ export const goToProjectCommand: JukeCommand<GoToArgs> = {
     modes: ['dialog'],
     prompts: [null],
     match: (text) => parseGoTo(text),
-    run: ({ name }) => {
-        const project = findProject($projects.get().projects, name);
+    run: ({ name }, context) => {
+        const projects = $projects.get().projects;
+        const names = parseAlternatives(context.alternatives, `go to ${name}`, (text) => parseGoTo(text)?.name ?? null);
+        const project =
+            names.map((candidate) => findProject(projects, candidate)).find((found) => found != null) ?? null;
         if (project == null) {
             return { say: i18n('juke.reply.project.notFound', name) };
         }

@@ -260,6 +260,34 @@ describe('create dialog', () => {
         expect($createFlow.get()?.type).toBe(blog);
     });
 
+    it('should try the type and the parent from every recognition alternative', async () => {
+        const startCtx: JukeContext = {
+            ...context(),
+            alternatives: ['great new host', 'create new post', 'great new post'],
+        };
+        const start = resolveCommand([startCtx.alternatives![0]], startCtx)!;
+        const post = type('post', 'Post');
+        mocks.fetchAllContentTypes.mockReturnValue(okAsync([...allTypes, post]));
+        mocks.getAvailableContentTypes.mockResolvedValue([blog, article, post]);
+
+        expect(await start.command.run(start.args, startCtx)).toEqual({
+            say: 'juke.reply.create.askParent|Post',
+            prompt: 'createParent',
+        });
+
+        mocks.findContentByName.mockImplementation(async (name: string) =>
+            name === 'blogs' ? { kind: 'match', value: blogs } : { kind: 'none' },
+        );
+        const parentCtx: JukeContext = { ...context('createParent'), alternatives: ['under blocks', 'under blogs'] };
+        const parentStep = resolveCommand(['under blocks'], parentCtx)!;
+
+        expect(await parentStep.command.run(parentStep.args, parentCtx)).toEqual({
+            say: 'juke.reply.create.askName|Post',
+            prompt: 'createName',
+        });
+        expect($createFlow.get()?.parent).toBe(blogs);
+    });
+
     it('should not offer media or abstract types and ask to try again', async () => {
         expect(await runResolved('create an image')).toEqual({ say: 'juke.reply.create.typeNotFound|image' });
         expect(await runResolved('create a base')).toEqual({ say: 'juke.reply.create.typeNotFound|base' });

@@ -32,6 +32,27 @@ function uniqueValues<T>(hits: MatchCandidate<T>[]): T[] {
     return [...new Set(hits.map((hit) => hit.value))];
 }
 
+// Runs a parser over every alternative and returns the values it yields, best
+// alternative first and without duplicates.
+export function parseAlternatives<T>(
+    alternatives: readonly string[] | undefined,
+    fallback: string,
+    parse: (text: string) => T | null,
+): T[] {
+    const texts = alternatives != null && alternatives.length > 0 ? alternatives : [fallback];
+    const seen = new Set<string>();
+    const values: T[] = [];
+    texts.forEach((text) => {
+        const value = parse(text);
+        const key = JSON.stringify(value);
+        if (value != null && !seen.has(key)) {
+            seen.add(key);
+            values.push(value);
+        }
+    });
+    return values;
+}
+
 export function bestUniqueMatch<T>(candidates: readonly MatchCandidate<T>[], spokenName: string): MatchResult<T> {
     const spoken = normalizeTranscript(spokenName);
     if (spoken.length === 0) {
