@@ -104,6 +104,7 @@ const makeAvailable = (): void => {
 
 describe('juke.service', () => {
     beforeEach(() => {
+        vi.spyOn(Math, 'random').mockReturnValue(0);
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
         recognizers = [];
         speeches = [];
@@ -118,6 +119,7 @@ describe('juke.service', () => {
     afterEach(() => {
         stop();
         vi.useRealTimers();
+        vi.restoreAllMocks();
     });
 
     it('stays off until the operator is running in browse mode with speech support', () => {

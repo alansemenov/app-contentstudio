@@ -163,7 +163,9 @@ replaces the dialog confirmation step.
 Phrases (`phrases.properties`). Greetings carry no comma before the name: speech synthesis turns a comma into
 an audible pause.
 - `juke.reply.hello=Hello {0}. What can I help you with today?`
-- `juke.reply.goodbye=Goodbye {0}. See you next time.`
+- `juke.reply.goodbye=Goodbye {0}. See you next time.` plus `juke.reply.goodbye.2`–`.5` variants ("Bye {0}. It was a
+  pleasure.", "See you later {0}. I'll be here when you need me.", "Goodbye {0}. Happy editing.", "Take care {0}.
+  Talk to you soon."); one is picked at random per farewell
 - `juke.reply.unknown=I'm not sure how to respond to this command. Please try again.`
 - `juke.reply.cancel=Ok` (universal cancel of any pending question)
 - `juke.notify.micDenied=Juke cannot hear you: microphone access is blocked for this site.`

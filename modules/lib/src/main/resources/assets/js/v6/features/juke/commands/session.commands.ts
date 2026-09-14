@@ -50,6 +50,19 @@ export const helloCommand: JukeCommand<true> = {
     },
 };
 
+// Farewell variants; one is picked at random so Juke does not sound scripted.
+export const FAREWELL_KEYS: readonly string[] = [
+    'juke.reply.goodbye',
+    'juke.reply.goodbye.2',
+    'juke.reply.goodbye.3',
+    'juke.reply.goodbye.4',
+    'juke.reply.goodbye.5',
+];
+
+export function pickFarewell(random: () => number = Math.random): string {
+    return FAREWELL_KEYS[Math.min(FAREWELL_KEYS.length - 1, Math.floor(random() * FAREWELL_KEYS.length))];
+}
+
 export const goodbyeCommand: JukeCommand<true> = {
     id: 'session.goodbye',
     modes: ['dialog'],
@@ -59,7 +72,7 @@ export const goodbyeCommand: JukeCommand<true> = {
         resetSearchFlow();
         resetActionFlow();
         return {
-            say: i18n('juke.reply.goodbye', context.userName),
+            say: i18n(pickFarewell(), context.userName),
             mode: 'idle',
             prompt: null,
         };

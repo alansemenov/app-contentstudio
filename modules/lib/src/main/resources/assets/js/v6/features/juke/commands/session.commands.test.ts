@@ -8,6 +8,8 @@ import {
     helloCommand,
     isSleepPhrase,
     isWakePhrase,
+    FAREWELL_KEYS,
+    pickFarewell,
     sessionCommands,
     stripJukeAddress,
 } from './session.commands';
@@ -92,7 +94,14 @@ describe('session commands', () => {
         expect(resolveCommand(['hello juke'], context('dialog'))?.command).toBe(helloCommand);
     });
 
+    it('picks a farewell variant from the list', () => {
+        expect(pickFarewell(() => 0)).toBe('juke.reply.goodbye');
+        expect(pickFarewell(() => 0.99)).toBe(FAREWELL_KEYS[FAREWELL_KEYS.length - 1]);
+        expect(new Set(FAREWELL_KEYS).size).toBe(FAREWELL_KEYS.length);
+    });
+
     it('goodbye is only accepted in dialog and closes it after speaking', async () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0);
         expect(resolveCommand(['goodbye juke'], context('idle'))).toBeNull();
 
         const resolved = resolveCommand(['goodbye juke'], context('dialog'));
