@@ -110,6 +110,7 @@ Within `dialog`, a `PendingPrompt` narrows what the next utterance means:
 |---|---|---|
 | `createParent` | "Create a <type>" | root phrases, "let's try again", or a parent display name |
 | `createName` | parent accepted | "let's try again", or any phrase as the new display name |
+| `closeTab` | "close the tab" with unsaved changes (M5) | yes (save and close) / no (close without saving) / cancel |
 | `search` | "New search" | filter phrases and keywords until a search is performed |
 | `showResults` | search finished with hits | "yes" (apply filter and open panel) or anything else (dismiss) |
 | `confirmDelete` | "Delete <target>" | yes / no / cancel |
@@ -431,8 +432,11 @@ is "close the tab".
 
 Phrases:
 - `juke.reply.tab.closing=Closing the tab.`
+- `juke.reply.tab.unsaved=There are unsaved changes. Do you want to save them before closing the tab?`
+- `juke.reply.tab.savingAndClosing=Saving and closing the tab.`
+- `juke.reply.tab.saveFailed=Saving failed. The tab stays open.`
 - `juke.reply.tab.cannotClose=I can't close this tab. Close it yourself.`
-- `juke.reply.handoff=Opening the editor. Juke continues there.` (spoken by the browse tab before it shuts down)
+- No hand-off phrase: the browse tab goes silent without a word, so it feels like one assistant across tabs.
 
 Design:
 - Hand-over marker: edit URLs Juke opens get a `juke=1` query parameter (through `ContentEditParams` →
@@ -442,22 +446,30 @@ Design:
   `jukeHandoff` is the URL marker. Note `aiEnabled` in the wizard is operator *or* translator running; the
   operator requirement stays: the wizard config exposes which plugins are enabled, or the host's
   `$aiRegisteredPlugins` is read once the boundary question is settled (see M6).
-- Browse tab shutdown: after `openEditContentTab` in the create dialog and the edit action, Juke speaks the
-  hand-off reply, then `stopJukeService()` (microphone released, mode `off`, widget hidden). A page reload of
-  the browse tab starts Juke again. "Preview" does not hand over.
+- Browse tab shutdown: after `openEditContentTab` in the create dialog and the edit action, the browse tab's
+  Juke stops silently — the create/edit reply is the last thing it says — via `stopJukeService()` (microphone
+  released, mode `off`, widget hidden). A page reload of the browse tab starts Juke again. "Preview" does not
+  hand over.
 - Edit-mode registry: session commands (hello/goodbye/cancel) and small talk are reused; browse-only commands
   (search, tree, project, toolbar, create) are not registered in wizard mode. New `tab.commands.ts`:
-  "close the tab" / "close this tab" / "close the editor" → `window.close()`. Chrome allows `window.close()`
-  only for tabs opened by script, which is the case here; otherwise the cannot-close reply.
+  - "close the tab" / "close this tab" / "close the editor": if the wizard has no unsaved changes
+    (`$wizardToolbar` dirty state / the wizard's `hasUnsavedChanges`), close at once. Otherwise ask the unsaved
+    phrase and enter prompt `closeTab`: "yes" saves through the wizard's save action, waits for the save to
+    finish, then closes; "no" closes without saving, suppressing the wizard's own beforeunload prompt for that
+    close; "cancel" leaves the tab open. Save failure: save-failed reply, tab stays open.
+  - "save changes and close the tab" / "save and close": saves without asking, then closes.
+  - Closing uses `window.close()`, allowed because the tab was opened by script; otherwise the cannot-close reply.
 - Widget mount: `JukeWidget` is added to `WizardAppShell` next to `BrowseAppShell`. The Juke service already
   starts from `AppElement.initialize()` for both modes; in wizard mode the dialog opens immediately in `dialog`
   mode (no "Hello, Juke" needed after a hand-over) and the greeting is skipped.
-- Unsaved changes: closing with unsaved changes triggers the wizard's own beforeunload prompt; Juke does not
-  bypass it.
+- The wizard's beforeunload prompt is bypassed only for a close the user has just answered "no" to; any other
+  navigation keeps it.
 
-Acceptance: "create a post" flow ends with the editor tab open, Juke silent in the browse tab and active in the
-editor; "close the tab" closes it; the browse tab stays silent until reloaded. Unit tests for the URL marker,
-availability gate, registry composition per mode and the close command.
+Acceptance: "create a post" flow ends with the editor tab open, Juke silent in the browse tab (no hand-off
+line) and active in the editor; "close the tab" closes a clean editor at once; with unsaved changes it asks,
+"yes" saves and closes, "no" closes without the browser prompt; "save changes and close the tab" saves and closes
+without asking. Unit tests for the URL marker, availability gate, registry composition per mode, the dirty
+check and the three close paths.
 
 ### Milestone 6 — Suggestions from Juke Content Operator (planned 2026-09-15)
 

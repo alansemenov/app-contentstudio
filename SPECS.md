@@ -210,13 +210,23 @@ previewed are skipped.
 When Juke opens an edit tab from the browse tab — after creating a new content or opening an existing one for
 edit — a new instance of the voice dispatcher takes over in edit mode, and the voice analyser in the previous
 (browse) tab becomes inactive. The simplest way to achieve this is to shut Juke down in the browse tab after it
-has created a new content or opened one for edit.
+has created a new content or opened one for edit. The browse tab says nothing about it: the user experience
+should carry on as if there is one assistant across all tabs.
 
 **Goal:** Juke in edit mode understands a first command.
 
 **Command:** "Close the tab"
 
-**Expected action:** The edit tab is closed.
+**Expected action:** Juke checks whether the content has unsaved changes.
+
+- No unsaved changes: the edit tab is closed.
+- Unsaved changes: Juke asks "There are unsaved changes. Do you want to save them before closing the tab?"
+  - User says "Yes": Juke saves the content and closes the tab.
+  - User says "No": Juke closes the tab without saving.
+
+**Command:** "Save changes and close the tab"
+
+**Expected action:** Juke saves the content without asking and closes the tab.
 
 ## Milestone 6 — Integration with Juke Content Operator
 
