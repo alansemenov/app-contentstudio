@@ -219,14 +219,17 @@ should carry on as if there is one assistant across all tabs.
 
 **Expected action:** Juke checks whether the content has unsaved changes.
 
-- No unsaved changes: the edit tab is closed.
+- No unsaved changes: Juke says "Closing the tab" and closes the edit tab.
 - Unsaved changes: Juke asks "There are unsaved changes. Do you want to save them before closing the tab?"
-  - User says "Yes": Juke saves the content and closes the tab.
-  - User says "No": Juke closes the tab without saving.
+  - User says "Yes": Juke says "Saving changes and closing the tab", saves the content and closes the tab.
+  - User says "No": Juke says "Closing the tab" and closes the tab without saving.
 
 **Command:** "Save changes and close the tab"
 
-**Expected action:** Juke saves the content without asking and closes the tab.
+**Expected action:** Juke says "Saving changes and closing the tab", saves the content without asking and closes
+the tab.
+
+Juke always speaks the confirmation before executing the action, so the user hears it before the tab goes away.
 
 ## Milestone 6 — Integration with Juke Content Operator
 

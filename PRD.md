@@ -431,9 +431,9 @@ Goal: an edit tab opened by Juke gets its own Juke; the browse tab that opened i
 is "close the tab".
 
 Phrases:
-- `juke.reply.tab.closing=Closing the tab.`
+- `juke.reply.tab.closing=Closing the tab.` (spoken before the tab closes)
 - `juke.reply.tab.unsaved=There are unsaved changes. Do you want to save them before closing the tab?`
-- `juke.reply.tab.savingAndClosing=Saving and closing the tab.`
+- `juke.reply.tab.savingAndClosing=Saving changes and closing the tab.` (spoken before saving)
 - `juke.reply.tab.saveFailed=Saving failed. The tab stays open.`
 - `juke.reply.tab.cannotClose=I can't close this tab. Close it yourself.`
 - No hand-off phrase: the browse tab goes silent without a word, so it feels like one assistant across tabs.
@@ -453,11 +453,16 @@ Design:
 - Edit-mode registry: session commands (hello/goodbye/cancel) and small talk are reused; browse-only commands
   (search, tree, project, toolbar, create) are not registered in wizard mode. New `tab.commands.ts`:
   - "close the tab" / "close this tab" / "close the editor": if the wizard has no unsaved changes
-    (`$wizardToolbar` dirty state / the wizard's `hasUnsavedChanges`), close at once. Otherwise ask the unsaved
-    phrase and enter prompt `closeTab`: "yes" saves through the wizard's save action, waits for the save to
-    finish, then closes; "no" closes without saving, suppressing the wizard's own beforeunload prompt for that
+    (`$wizardToolbar` dirty state / the wizard's `hasUnsavedChanges`), say "Closing the tab." and close.
+    Otherwise ask the unsaved phrase and enter prompt `closeTab`: "yes" says "Saving changes and closing the
+    tab.", saves through the wizard's save action, waits for the save to finish, then closes; "no" says
+    "Closing the tab." and closes without saving, suppressing the wizard's own beforeunload prompt for that
     close; "cancel" leaves the tab open. Save failure: save-failed reply, tab stays open.
-  - "save changes and close the tab" / "save and close": saves without asking, then closes.
+  - "save changes and close the tab" / "save and close": says "Saving changes and closing the tab.", saves
+    without asking, then closes.
+  - Confirmations are spoken *before* the action runs, because closing the tab would cut the speech off.
+    `JukeReply` gets an optional `then: () => Promise<void>` that the service runs after the reply has been
+    spoken (and after applying the reply's prompt/mode); the tab commands put the save and the close there.
   - Closing uses `window.close()`, allowed because the tab was opened by script; otherwise the cannot-close reply.
 - Widget mount: `JukeWidget` is added to `WizardAppShell` next to `BrowseAppShell`. The Juke service already
   starts from `AppElement.initialize()` for both modes; in wizard mode the dialog opens immediately in `dialog`
@@ -468,7 +473,7 @@ Design:
 Acceptance: "create a post" flow ends with the editor tab open, Juke silent in the browse tab (no hand-off
 line) and active in the editor; "close the tab" closes a clean editor at once; with unsaved changes it asks,
 "yes" saves and closes, "no" closes without the browser prompt; "save changes and close the tab" saves and closes
-without asking. Unit tests for the URL marker, availability gate, registry composition per mode, the dirty
+without asking. Each close is preceded by the spoken confirmation, and the close waits for the speech to end. Unit tests for the URL marker, availability gate, registry composition per mode, the dirty
 check and the three close paths.
 
 ### Milestone 6 — Suggestions from Juke Content Operator (planned 2026-09-15)
