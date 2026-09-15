@@ -230,6 +230,11 @@ tab picks the conversation up again without a greeting.
 **Expected action:** Juke says "Saving changes and closing the tab", saves the content without asking and closes
 the tab.
 
+**Command:** "Save the changes" / "Save the content"
+
+**Expected action:** Juke saves the content without closing the tab. Content Studio shows the same notification
+about saved changes as after a manual save.
+
 Juke always speaks the confirmation before executing the action, so the user hears it before the tab goes away.
 
 ## Milestone 6 — Integration with Juke Content Operator

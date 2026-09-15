@@ -435,6 +435,8 @@ Phrases:
 - `juke.reply.tab.unsaved=There are unsaved changes. Do you want to save them before closing the tab?`
 - `juke.reply.tab.savingAndClosing=Saving changes and closing the tab.` (spoken before saving)
 - `juke.reply.tab.saveFailed=Saving failed. The tab stays open.`
+- `juke.reply.tab.saved=Changes saved.`, `juke.reply.tab.nothingToSave=There are no unsaved changes.`,
+  `juke.reply.tab.saveOnlyFailed=Saving failed. Please try again.` (save without closing)
 - `juke.reply.tab.cannotClose=I can't close this tab. Close it yourself.`
 - No hand-off phrase: the browse tab goes silent without a word, so it feels like one assistant across tabs.
 
@@ -466,6 +468,9 @@ Design:
     question; "cancel" leaves the tab open. Save failure: save-failed reply, tab stays open.
   - "save (the changes) and close (the tab)" / "save and close": says "Saving changes and closing the tab.",
     saves without asking, then closes. Also accepted as the answer to the unsaved question.
+  - "save (the changes|the content|it)" / "save": saves through the bridge without closing and says "Changes
+    saved."; the wizard's own "Item ... has been saved" notification appears as after a manual save. With
+    nothing to save Juke says so and does not call the wizard.
   - Confirmations are spoken *before* the action runs, because closing the tab would cut the speech off.
     `JukeReply` has an optional `after` hook (not `then`, which would make a reply a thenable) that the service
     runs after the reply has been spoken and its prompt/mode applied; it may answer with a follow-up reply

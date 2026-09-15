@@ -67,9 +67,37 @@ describe('tab commands', () => {
         },
     );
 
+    it.each(['save the changes', 'save the content', 'save changes', 'save it', 'save'])(
+        'should recognize "%s" as saving',
+        (text) => {
+            expect(resolveCommand([text], context())?.command.id).toBe('tab.save');
+        },
+    );
+
     it('should not recognize other tab talk', () => {
         expect(resolveCommand(['close the folder'], context())).toBeNull();
-        expect(resolveCommand(['save'], context())).toBeNull();
+        expect(resolveCommand(['save the world'], context())).toBeNull();
+    });
+
+    it('should save without closing and confirm', async () => {
+        bridge.hasUnsavedChanges.mockReturnValue(true);
+
+        expect(await say('save the changes')).toEqual({ say: 'juke.reply.tab.saved' });
+        expect(bridge.save).toHaveBeenCalledTimes(1);
+        expect(bridge.close).not.toHaveBeenCalled();
+    });
+
+    it('should say when there is nothing to save', async () => {
+        expect(await say('save the content')).toEqual({ say: 'juke.reply.tab.nothingToSave' });
+        expect(bridge.save).not.toHaveBeenCalled();
+    });
+
+    it('should report a failed save', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        bridge.hasUnsavedChanges.mockReturnValue(true);
+        bridge.save.mockRejectedValue(new Error('boom'));
+
+        expect(await say('save')).toEqual({ say: 'juke.reply.tab.saveOnlyFailed' });
     });
 
     it('should announce, then close a clean editor', async () => {

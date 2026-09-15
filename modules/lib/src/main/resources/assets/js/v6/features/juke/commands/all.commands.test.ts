@@ -75,6 +75,8 @@ describe('editorCommands', () => {
     it.each([
         ['close the tab', 'tab.close'],
         ['save changes and close the tab', 'tab.saveAndClose'],
+        ['save the changes', 'tab.save'],
+        ['save the content', 'tab.save'],
         ['how are you', 'smalltalk.howAreYou'],
         ['cancel', 'session.cancel'],
         ['goodbye juke', 'session.goodbye'],

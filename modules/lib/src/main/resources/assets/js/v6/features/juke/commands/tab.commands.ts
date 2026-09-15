@@ -8,6 +8,7 @@ import { parseYesNo, type YesNoArgs } from './toolbar.commands';
 //
 //   "close the tab"                    -> closes at once, or asks about unsaved changes
 //   "save changes and close the tab"   -> saves, then closes, without asking
+//   "save the changes"                 -> saves; the wizard shows its usual notification
 //
 // Confirmations are spoken before the action runs, because closing the tab
 // would cut the speech off; the work sits in the reply's `after` hook.
@@ -18,6 +19,7 @@ const CLOSE_PATTERN = new RegExp(`^(?:close|clothes|closed)\\s+${TAB}$`);
 const SAVE_AND_CLOSE_PATTERN = new RegExp(
     `^save(?:\\s+(?:the\\s+|my\\s+)?changes)?(?:\\s+and|,)?\\s+close(?:\\s+${TAB})?$`,
 );
+const SAVE_PATTERN = /^save(?:\s+(?:the\s+|my\s+|this\s+)?(?:changes|content|item|it))?$/;
 
 // window.close() is ignored for tabs the script did not open; the tab is then
 // still there a moment later.
@@ -47,6 +49,26 @@ const savingAndClosing = (): JukeReply => ({
     prompt: null,
     after: saveAndCloseTab,
 });
+
+export const saveCommand: JukeCommand<true> = {
+    id: 'tab.save',
+    modes: ['dialog'],
+    prompts: [null],
+    match: (text) => (SAVE_PATTERN.test(text) ? true : null),
+    run: async () => {
+        const bridge = getJukeEditorBridge();
+        if (bridge == null || !bridge.hasUnsavedChanges()) {
+            return { say: i18n('juke.reply.tab.nothingToSave') };
+        }
+        try {
+            await bridge.save();
+        } catch (error) {
+            console.error('[juke] saving failed', error);
+            return { say: i18n('juke.reply.tab.saveOnlyFailed') };
+        }
+        return { say: i18n('juke.reply.tab.saved') };
+    },
+};
 
 export const closeTabCommand: JukeCommand<true> = {
     id: 'tab.close',
@@ -86,4 +108,9 @@ export const closeTabAnswerCommand: JukeCommand<YesNoArgs> = {
     },
 };
 
-export const tabCommands: readonly JukeCommand[] = [closeTabCommand, saveAndCloseTabCommand, closeTabAnswerCommand];
+export const tabCommands: readonly JukeCommand[] = [
+    closeTabCommand,
+    saveAndCloseTabCommand,
+    saveCommand,
+    closeTabAnswerCommand,
+];
