@@ -204,3 +204,43 @@ Juke opens a browser tab with a preview of each target item that can be previewe
 previewed are skipped.
 
 **Code to investigate:** `PreviewActionHelper.ts`
+
+## Milestone 5 — Voice commands in edit mode
+
+When Juke opens an edit tab from the browse tab — after creating a new content or opening an existing one for
+edit — a new instance of the voice dispatcher takes over in edit mode, and the voice analyser in the previous
+(browse) tab becomes inactive. The simplest way to achieve this is to shut Juke down in the browse tab after it
+has created a new content or opened one for edit.
+
+**Goal:** Juke in edit mode understands a first command.
+
+**Command:** "Close the tab"
+
+**Expected action:** The edit tab is closed.
+
+## Milestone 6 — Integration with Juke Content Operator
+
+Use voice commands to make the Juke Content Operator app (standalone, backed by Vertex) generate suggestions
+for text inputs of the content being edited, without opening the operator's modal dialog.
+
+**Commands:**
+
+- "Create suggestion for <input 1 label>"
+- "Create suggestions for <input 1 label> and <input 2 label>"
+
+**Expected action:** The voice analyser in Content Studio communicates with the Juke Content Operator, the
+operator generates suggestions for the requested fields, and the suggestions are inserted into those fields.
+
+## Milestone 7 — Integration with Juke Translator
+
+Use voice commands to translate text input values with the Juke Translator app (standalone, backed by Vertex),
+without opening the translator's modal dialog.
+
+**Commands:**
+
+- "Translate content into <language>"
+- "Translate <input label> into <language>"
+
+**Expected action:** The voice analyser in Content Studio communicates with the Juke Translator and the
+requested fields (or the whole content) are translated into the requested language.
+

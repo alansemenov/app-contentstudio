@@ -423,12 +423,92 @@ Acceptance:
 - "Cancel" and "let's try again" work in every prompt as in the create dialog.
 - Toolbar actions do not change the selection; the mouse selection stays whatever it was.
 
+### Milestone 5 — Voice commands in edit mode (planned 2026-09-15)
+
+Goal: an edit tab opened by Juke gets its own Juke; the browse tab that opened it goes quiet; first command
+is "close the tab".
+
+Phrases:
+- `juke.reply.tab.closing=Closing the tab.`
+- `juke.reply.tab.cannotClose=I can't close this tab. Close it yourself.`
+- `juke.reply.handoff=Opening the editor. Juke continues there.` (spoken by the browse tab before it shuts down)
+
+Design:
+- Hand-over marker: edit URLs Juke opens get a `juke=1` query parameter (through `ContentEditParams` →
+  `ContentUrlHelper.generateEditContentUrl`, which already carries `displayAsNew`/`localized`). The wizard reads
+  it at startup; only then does Juke start in that tab. Manually opened editors stay silent for now.
+- Availability in wizard mode: `$jukeAvailable` becomes `aiEnabled && (browseMode || jukeHandoff)` where
+  `jukeHandoff` is the URL marker. Note `aiEnabled` in the wizard is operator *or* translator running; the
+  operator requirement stays: the wizard config exposes which plugins are enabled, or the host's
+  `$aiRegisteredPlugins` is read once the boundary question is settled (see M6).
+- Browse tab shutdown: after `openEditContentTab` in the create dialog and the edit action, Juke speaks the
+  hand-off reply, then `stopJukeService()` (microphone released, mode `off`, widget hidden). A page reload of
+  the browse tab starts Juke again. "Preview" does not hand over.
+- Edit-mode registry: session commands (hello/goodbye/cancel) and small talk are reused; browse-only commands
+  (search, tree, project, toolbar, create) are not registered in wizard mode. New `tab.commands.ts`:
+  "close the tab" / "close this tab" / "close the editor" → `window.close()`. Chrome allows `window.close()`
+  only for tabs opened by script, which is the case here; otherwise the cannot-close reply.
+- Widget mount: `JukeWidget` is added to `WizardAppShell` next to `BrowseAppShell`. The Juke service already
+  starts from `AppElement.initialize()` for both modes; in wizard mode the dialog opens immediately in `dialog`
+  mode (no "Hello, Juke" needed after a hand-over) and the greeting is skipped.
+- Unsaved changes: closing with unsaved changes triggers the wizard's own beforeunload prompt; Juke does not
+  bypass it.
+
+Acceptance: "create a post" flow ends with the editor tab open, Juke silent in the browse tab and active in the
+editor; "close the tab" closes it; the browse tab stays silent until reloaded. Unit tests for the URL marker,
+availability gate, registry composition per mode and the close command.
+
+### Milestone 6 — Suggestions from Juke Content Operator (planned 2026-09-15)
+
+Goal: "create suggestion for <label>" / "create suggestions for <label 1> and <label 2>" in edit mode makes the
+operator generate values for those inputs (via Vertex) and inserts them, without opening the operator dialog.
+
+Design:
+- Field resolution: the spoken labels are matched with `bestUniqueMatch` against the input labels of the content
+  type form (`$aiContentType.getForm()` — the same form the operator receives in `schema:change`), mixins and the
+  page config, producing `AiFieldPath`s (`{ kind: 'data', field }` etc.). Unknown or ambiguous labels are
+  reported per label; the rest proceed.
+- Protocol: the CS ↔ plugin contract (`features/ai/ai-protocol.ts`, mirrored byte-for-byte in
+  app-ai-content-operator and app-ai-translator) currently has no command for "generate values for these
+  fields". Milestone 6 adds `'generate:fields': { paths: AiFieldPath[]; instructions?: string; requestId }` to
+  `AiCommands` and a `'generate:result'`-style completion signal (or reuses `applyValue` + `setFieldState` as the
+  operator already does when applying from its dialog). The operator app must implement the command; that is a
+  change in the app-ai-content-operator repo and a protocol version bump. Until the operator supports it, Juke
+  answers `juke.reply.ai.unsupported`.
+- Boundary: `features/juke` cannot import `features/ai`. The command dispatch (`emitToPlugin`) is exposed through
+  a shared bridge (`shared/ai/ai-bridge.store.ts` or an entity), the same way the filter store was moved.
+- Flow: parse labels → resolve paths → `generate:fields` → per-field `setFieldState('processing')` is the
+  operator's job → Juke waits for completion (timeout 60 s) → replies "Suggestions inserted for <labels>" or per
+  field failures. The wizard is left dirty, not saved.
+- Phrases: `juke.reply.ai.generating=Generating suggestions for {0}.`, `juke.reply.ai.generated=Done. {0}
+  updated.`, `juke.reply.ai.fieldNotFound=I can't find a field called {0}.`, `juke.reply.ai.unsupported=The Juke
+  operator does not support this yet.`, `juke.reply.ai.failed=The suggestion for {0} failed.`
+
+### Milestone 7 — Translation with Juke Translator (planned 2026-09-15)
+
+Goal: "translate content into <language>" / "translate <label> into <language>" in edit mode translates the
+whole content or the named field with the translator (via Vertex), without opening its dialog.
+
+Design:
+- Language resolution: the spoken language is matched against the languages the translator offers (the wizard's
+  language list, `entities/language`), by display name and code; unknown → `juke.reply.translate.languageNotFound`.
+- Field resolution as in M6; "content" means all translatable fields.
+- Protocol: adds `'translate:fields': { paths: AiFieldPath[] | 'all'; language: string; requestId }` to
+  `AiCommands`, implemented in app-ai-translator; same completion handling and boundary bridge as M6. Until
+  supported: `juke.reply.ai.unsupported`.
+- Phrases: `juke.reply.translate.working=Translating {0} into {1}.`, `juke.reply.translate.done=Done. {0}
+  translated into {1}.`, `juke.reply.translate.languageNotFound=I don't know the language {0}.`
+
+Open questions for M6/M7 (need the operator/translator repos): the exact request/response shape both plugins
+expect, whether generation should respect the operator's per-app instructions (`updateAiInstructions`), and
+how field-level processing state is reported back so Juke can time its reply.
+
 ## 6. Non-goals (milestones 1–4)
 
 - No LLM, no MCP, no server-side speech processing, no new server endpoints.
-- No wizard/editor tab support.
+- No wizard/editor tab support (lifted in M5).
 - No multi-language recognition.
-- No functional use of the Juke Operator or Juke Translator.
+- No functional use of the Juke Operator or Juke Translator (lifted in M6/M7).
 - No settings UI for enabling/disabling Juke.
 
 ## 7. Risks
@@ -461,3 +541,12 @@ Branch: `juke-voice`. Verify each step with `pnpm -C ./modules/lib run check` an
      APIs, preview via `PreviewActionHelper`; phrases;
      tests.
 5. After each milestone: manual verification checklist in Chrome on the `juke` sandbox, then pause for review.
+6. **Milestone 5** (commit "Add Juke to the editor tab with hand-over from browse")
+   - URL marker, wizard availability gate, widget in `WizardAppShell`, browse-tab shutdown after hand-over,
+     `tab.commands.ts`; phrases; tests.
+7. **Milestone 6** (commit "Generate field suggestions with Juke Operator by voice")
+   - Field label resolver over the form schema, `generate:fields` protocol command + shared AI bridge, operator
+     side in app-ai-content-operator; phrases; tests.
+8. **Milestone 7** (commit "Translate fields with Juke Translator by voice")
+   - Language resolver, `translate:fields` protocol command, translator side in app-ai-translator; phrases;
+     tests.
