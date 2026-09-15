@@ -29,6 +29,7 @@ is not used functionally, only as a gate.
 | Delivery | Feature branch `juke-voice` off `master`, one or a few commits per milestone. Jar renamed to `hackathon.jar` (done). | User choice. |
 | Code location | All new code under `modules/lib/src/main/resources/assets/js/v6/features/juke/` (Preact, strict TS, Tailwind, nanostores). Legacy `app/` is called into, never extended. | Project CLAUDE.md. |
 | Localization | All spoken and displayed strings in `phrases.properties` under `juke.*` keys. | Project convention. |
+| Plugin repos | `/Users/ase/dev/app-ai-content-operator` and `/Users/ase/dev/app-ai-translator` may be modified for M6/M7 (protocol commands, headless generation/translation). Their `shared/ai-protocol.ts` mirrors must stay byte-identical to CS's. | User permission 2026-09-15. |
 | Hackathon branding | App key is `com.enonic.app.hackathon` (Gradle `app.name`), so it installs next to the original Content Studio. JAX-RS group `v2hackathon` and REST root `/admin/rest-v2/hackathon/` (server `ResourceConstants`, client `shared/lib/url/cms.ts` and legacy `UrlHelper`) avoid clashing with the original's `/admin/rest-v2/cs/`. `AdminSiteHandler`, `ContentIconUrlResolver` and `LiveEditInjection` use the new key. OSGi `configurationPid` stays `com.enonic.app.contentstudio` so the same `.cfg` applies; XP `app.config` reads `com.enonic.app.hackathon.cfg`. Display name is "AI Hackathon" (descriptors and all `phrases*.properties` locales). `main.svg` and `application.svg` show the tree with the Juke head as a bottom-right badge. Jar is `hackathon.jar`. Extensions owned by a sibling Content Studio installation (`entities/extension/lib/siblingExtensions.ts`, keys `com.enonic.app.contentstudio` / `com.enonic.app.hackathon` other than `config.appId`) are dropped in both extension fetch paths (v6 `fetchExtensions`, legacy `GetExtensionsByInterfaceRequest`), so previews, context widgets and settings from the other app never show up while third-party extensions do. The sidebar matches its own main and settings items by `config.appId`; the settings extension declares the private `hackathon.menuitem` interface (the main tool loads both) so the original app does not list it either. Custom XP event names still use the `com.enonic.app.contentstudio.*` prefix and are shared with the original app. | User request on 2026-09-10, to run this build side by side with the original Content Studio on the same XP. |
 | Build tests | `hackathonTestsOnly=true` in `gradle.properties` disables all Java `Test` tasks in `modules/app` and limits the Gradle `pnpmTest` task to `features/juke`. Set to `false` to restore the full suite. | User request on 2026-09-10 to keep hackathon builds fast; temporary. |
 
@@ -463,23 +464,41 @@ availability gate, registry composition per mode and the close command.
 Goal: "create suggestion for <label>" / "create suggestions for <label 1> and <label 2>" in edit mode makes the
 operator generate values for those inputs (via Vertex) and inserts them, without opening the operator dialog.
 
+Plugin repositories (surveyed 2026-09-15): `/Users/ase/dev/app-ai-content-operator` and
+`/Users/ase/dev/app-ai-translator` (both `2.1.0-SNAPSHOT`, XP `8.1.0-SNAPSHOT`); the user allows changes there.
+Each mirrors `ai-protocol.ts` under `src/main/resources/shared/` — the mirror must stay byte-identical to CS's.
+
+How the operator works today (`assets/store/websocket/websocket.utils.ts`):
+- Generation is prompt-driven. `sendPrompt(nodes)` turns the chat input into text where a field mention becomes
+  `{{/path}}` (`parseText`, path like `/title` or `/items/item[2]/title`, `/__topic__` for the display name),
+  then sends `MessageType.GENERATE` with `{ prompt, instructions, history, meta: { language, contentPath },
+  fields }` (`createGenerateMessagePayload`). The server answers `ANALYZED` then `GENERATED` with a
+  `GenerationResult` keyed by path; `FAILED` on error.
+- Results are applied only when the user clicks Apply in the chat: `applyResults(items)` in
+  `store/host/host.utils.ts` maps each path to an `AiFieldPath` (`pathStringToAiFieldPath`) and calls
+  `api.applyValue` + `api.animateField`.
+
 Design:
-- Field resolution: the spoken labels are matched with `bestUniqueMatch` against the input labels of the content
-  type form (`$aiContentType.getForm()` — the same form the operator receives in `schema:change`), mixins and the
-  page config, producing `AiFieldPath`s (`{ kind: 'data', field }` etc.). Unknown or ambiguous labels are
-  reported per label; the rest proceed.
-- Protocol: the CS ↔ plugin contract (`features/ai/ai-protocol.ts`, mirrored byte-for-byte in
-  app-ai-content-operator and app-ai-translator) currently has no command for "generate values for these
-  fields". Milestone 6 adds `'generate:fields': { paths: AiFieldPath[]; instructions?: string; requestId }` to
-  `AiCommands` and a `'generate:result'`-style completion signal (or reuses `applyValue` + `setFieldState` as the
-  operator already does when applying from its dialog). The operator app must implement the command; that is a
-  change in the app-ai-content-operator repo and a protocol version bump. Until the operator supports it, Juke
-  answers `juke.reply.ai.unsupported`.
-- Boundary: `features/juke` cannot import `features/ai`. The command dispatch (`emitToPlugin`) is exposed through
-  a shared bridge (`shared/ai/ai-bridge.store.ts` or an entity), the same way the filter store was moved.
-- Flow: parse labels → resolve paths → `generate:fields` → per-field `setFieldState('processing')` is the
-  operator's job → Juke waits for completion (timeout 60 s) → replies "Suggestions inserted for <labels>" or per
-  field failures. The wizard is left dirty, not saved.
+- Field resolution (CS side): spoken labels are matched with `bestUniqueMatch` against the input labels of the
+  content type form (`$aiContentType.getForm()`), mixins and page config, yielding `AiFieldPath`s. Unknown or
+  ambiguous labels are reported per label; the rest proceed.
+- Protocol (both repos + CS): add to `AiCommands`
+  `'generate:fields': { requestId: string; paths: AiFieldPath[]; instructions?: string }` and a host-side
+  completion signal `'generate:done': { requestId; applied: AiFieldPath[]; failed: { path; message }[] }` (a
+  new `AiPluginApi` method `reportResult(requestId, …)` is the smallest addition; alternatively CS infers
+  completion from `setFieldState('completed')` per path, which the operator does not emit today). Bump
+  `AI_PROTOCOL_VERSION` to 3 and update both mirrors.
+- Operator side: handle `generate:fields` by building a prompt from a template — "Generate a suggestion for
+  {{/path1}} and {{/path2}}." — with the mentions for the requested paths, send it through the existing
+  generate pipeline (`createGenerateMessagePayload` + `sendGenerateMessage`), and on `GENERATED` auto-apply the
+  result entries for the requested paths via `applyResults`, then report done. The chat history still records
+  the exchange, so the dialog shows it if opened later. No dialog is shown.
+- Boundary: `features/juke` cannot import `features/ai`. The command dispatch (`emitToPlugin` on the registered
+  plugin) and the completion signal are exposed through a shared bridge store (`shared/ai/ai-bridge.store.ts`),
+  as the filter store was moved.
+- Flow: parse labels → resolve paths → `generate:fields` → operator sets `setFieldState('processing')` per
+  path → Juke waits for `generate:done` (timeout 60 s, matching the operator's `STOP_GENERATION_TIMEOUT`) →
+  replies "Done. <labels> updated." or per-field failures. The wizard is left dirty, not saved.
 - Phrases: `juke.reply.ai.generating=Generating suggestions for {0}.`, `juke.reply.ai.generated=Done. {0}
   updated.`, `juke.reply.ai.fieldNotFound=I can't find a field called {0}.`, `juke.reply.ai.unsupported=The Juke
   operator does not support this yet.`, `juke.reply.ai.failed=The suggestion for {0} failed.`
@@ -489,19 +508,33 @@ Design:
 Goal: "translate content into <language>" / "translate <label> into <language>" in edit mode translates the
 whole content or the named field with the translator (via Vertex), without opening its dialog.
 
-Design:
-- Language resolution: the spoken language is matched against the languages the translator offers (the wizard's
-  language list, `entities/language`), by display name and code; unknown → `juke.reply.translate.languageNotFound`.
-- Field resolution as in M6; "content" means all translatable fields.
-- Protocol: adds `'translate:fields': { paths: AiFieldPath[] | 'all'; language: string; requestId }` to
-  `AiCommands`, implemented in app-ai-translator; same completion handling and boundary bridge as M6. Until
-  supported: `juke.reply.ai.unsupported`.
-- Phrases: `juke.reply.translate.working=Translating {0} into {1}.`, `juke.reply.translate.done=Done. {0}
-  translated into {1}.`, `juke.reply.translate.languageNotFound=I don't know the language {0}.`
+How the translator works today (`assets/store/websocket/websocket.utils.ts`):
+- `startTranslation()` reads the persisted content id and project, the target language from the wizard's
+  language (`getLanguage()` → "tag (name)"), custom instructions, connects and sends `MessageType.TRANSLATE`
+  with `{ contentId, project, targetLanguage, customInstructions }`. The server reads the *persisted* content,
+  answers `ACCEPTED { paths }` then one `COMPLETED { path, text }` per field (applied at once via
+  `api.applyValue` + `setFieldState('completed')`) or `FAILED { path?, code }`.
+- So translation works on saved data and always covers every translatable field; the client only tracks
+  per-path progress in `store/items`.
 
-Open questions for M6/M7 (need the operator/translator repos): the exact request/response shape both plugins
-expect, whether generation should respect the operator's per-app instructions (`updateAiInstructions`), and
-how field-level processing state is reported back so Juke can time its reply.
+Design:
+- Language resolution: the spoken language is matched against the languages the wizard offers
+  (`entities/language`, display name and tag); unknown → `juke.reply.translate.languageNotFound`. The target
+  string is built as the translator does ("tag (name)").
+- Field resolution as in M6; "content" means all translatable fields.
+- Protocol: add `'translate:fields': { requestId; language: string; paths?: AiFieldPath[] }` to `AiCommands`
+  plus the shared `'…:done'` completion signal. Translator side: run `startTranslation` with the given target
+  language; when `paths` is given, apply `COMPLETED` results only for those paths and treat the rest as skipped
+  (no server change needed; a `paths` filter in the `TRANSLATE` payload is an optional server-side optimisation).
+- Unsaved changes: the translator reads persisted content, so Juke calls the host's `requestSave()` equivalent
+  (wizard save) and waits for the save before sending `translate:fields`; the dialog has the same constraint.
+- Phrases: `juke.reply.translate.working=Translating {0} into {1}.`, `juke.reply.translate.done=Done. {0}
+  translated into {1}.`, `juke.reply.translate.languageNotFound=I don't know the language {0}.`,
+  `juke.reply.translate.saving=Saving first.`
+
+Remaining open points: whether the operator's default instructions (`$config.instructions`) should apply to
+voice-driven generation (assume yes), and the exact wording of the generation prompt template so the model
+returns one value per requested path.
 
 ## 6. Non-goals (milestones 1–4)
 
