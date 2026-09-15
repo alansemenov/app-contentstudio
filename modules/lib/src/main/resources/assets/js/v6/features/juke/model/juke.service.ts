@@ -15,6 +15,7 @@ import { createSpeaker as defaultCreateSpeaker, type Speaker } from '../speech/s
 import { $config } from '../../../shared/config/config.store';
 import { resetActionFlow } from './actionFlow.store';
 import { resetCreateFlow } from './createFlow.store';
+import { createChannel as defaultCreateChannel, type JukeChannel, type JukeChannelMessage } from './juke.channel';
 import { resetSearchFlow } from './searchFlow.store';
 import {
     $jukeAvailable,
@@ -39,11 +40,13 @@ import {
 export type JukeServiceDeps = {
     createRecognizer?: (handlers: RecognizerHandlers) => Recognizer | null;
     createSpeaker?: () => Speaker | null;
+    createChannel?: () => JukeChannel | null;
 };
 
 let unsubscribe: (() => void) | null = null;
 let recognizer: Recognizer | null = null;
 let speaker: Speaker | null = null;
+let channel: JukeChannel | null = null;
 let deniedNotified = false;
 let commandsRegistered = false;
 // Set while the conversation is in another tab.
@@ -51,6 +54,7 @@ let handoffTimer: ReturnType<typeof setInterval> | null = null;
 let deps: Required<JukeServiceDeps> = {
     createRecognizer: (handlers) => defaultCreateRecognizer(handlers),
     createSpeaker: () => defaultCreateSpeaker(),
+    createChannel: () => defaultCreateChannel(),
 };
 
 // Replies are spoken one after another, never interleaved.
@@ -64,6 +68,12 @@ let queue: Promise<void> = Promise.resolve();
 export const ECHO_GRACE_MS = 1000;
 let speaking = false;
 let speechEndedAt = 0;
+// Juke is speaking in another tab (the browse tab finishing its hand-over
+// reply while this editor tab starts). Assumed until the other tab answers a
+// sync request, or this long without an answer.
+export const SYNC_TIMEOUT_MS = 1500;
+let remoteSpeaking = false;
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
 // The last few replies; see isEchoOf for why more than one is kept.
 export const RECENT_SPOKEN_SIZE = 3;
 let recentSpoken: string[] = [];
@@ -108,6 +118,7 @@ const respond = async (reply: JukeReply): Promise<void> => {
         speaking = false;
         speechEndedAt = Date.now();
         console.info('[juke] finished speaking');
+        channel?.post({ kind: 'spoken', text: reply.say });
         setJukeActivity('listening');
         if (reply.prompt !== undefined) {
             setJukePrompt(reply.prompt);
@@ -134,13 +145,23 @@ const runStep = async (
 };
 
 const withoutSelfEcho = (normalized: readonly string[]): string[] | null => {
-    if (speaking || Date.now() - speechEndedAt < ECHO_GRACE_MS) {
+    if (speaking || remoteSpeaking || Date.now() - speechEndedAt < ECHO_GRACE_MS) {
         return null;
     }
     const remaining = normalized
         .map((text) => stripEchoPrefix(text, recentSpoken))
         .filter((text) => text.length > 0 && !isEchoOf(text, recentSpoken));
     return remaining.length > 0 ? remaining : null;
+};
+
+const echoReason = (): string => {
+    if (speaking) {
+        return 'while speaking';
+    }
+    if (remoteSpeaking) {
+        return 'while another tab speaks';
+    }
+    return `${Date.now() - speechEndedAt} ms after speaking`;
 };
 
 const handleTranscripts = (alternatives: string[]): void => {
@@ -150,11 +171,7 @@ const handleTranscripts = (alternatives: string[]): void => {
     }
     const normalized = withoutSelfEcho(heard);
     if (normalized == null) {
-        console.info(
-            '[juke] ignored own speech',
-            JSON.stringify(heard[0]),
-            speaking ? 'while speaking' : `${Date.now() - speechEndedAt} ms after speaking`,
-        );
+        console.info('[juke] ignored own speech', JSON.stringify(heard[0]), echoReason());
         return;
     }
     setJukeTranscript(normalized[0]);
@@ -210,6 +227,53 @@ const handleTranscripts = (alternatives: string[]): void => {
     });
 };
 
+const clearSyncTimer = (): void => {
+    if (syncTimer != null) {
+        clearTimeout(syncTimer);
+        syncTimer = null;
+    }
+};
+
+const rememberSpoken = (texts: readonly string[]): void => {
+    recentSpoken = [...texts, ...recentSpoken].slice(0, RECENT_SPOKEN_SIZE);
+};
+
+const handleChannelMessage = (message: JukeChannelMessage): void => {
+    switch (message.kind) {
+        case 'sync':
+            if (speaking || recognizer != null) {
+                channel?.post({ kind: 'state', speaking, recent: recentSpoken });
+            }
+            return;
+        case 'state':
+            clearSyncTimer();
+            remoteSpeaking = message.speaking;
+            speechEndedAt = Date.now();
+            rememberSpoken(message.recent);
+            return;
+        case 'spoken':
+            clearSyncTimer();
+            remoteSpeaking = false;
+            speechEndedAt = Date.now();
+            rememberSpoken([message.text]);
+            return;
+    }
+};
+
+// Asks the other tabs whether Juke is talking there, and stays deaf until told
+// (or until it is clear nobody is going to answer).
+const syncWithOtherTabs = (): void => {
+    if (channel == null) {
+        return;
+    }
+    remoteSpeaking = true;
+    channel.post({ kind: 'sync' });
+    syncTimer = setTimeout(() => {
+        syncTimer = null;
+        remoteSpeaking = false;
+    }, SYNC_TIMEOUT_MS);
+};
+
 const stopHandoffWatch = (): void => {
     if (handoffTimer != null) {
         clearInterval(handoffTimer);
@@ -219,6 +283,8 @@ const stopHandoffWatch = (): void => {
 
 const deactivate = (): void => {
     stopHandoffWatch();
+    clearSyncTimer();
+    remoteSpeaking = false;
     recognizer?.stop();
     recognizer = null;
     speaker?.cancel();
@@ -257,8 +323,14 @@ const activate = (): void => {
         return;
     }
     recognizer.start();
-    // After a hand-over the conversation simply continues in the new tab.
-    setJukeMode(isHandoffTab() ? 'dialog' : 'idle');
+    // After a hand-over the conversation simply continues in the new tab, while
+    // the browse tab may still be finishing its last reply.
+    if (isHandoffTab()) {
+        syncWithOtherTabs();
+        setJukeMode('dialog');
+    } else {
+        setJukeMode('idle');
+    }
 };
 
 // Goes quiet while the conversation continues in the other tab, and picks it up
@@ -287,6 +359,8 @@ export const start = (overrides: JukeServiceDeps = {}): void => {
         return;
     }
     deps = { ...deps, ...overrides };
+    channel = deps.createChannel();
+    channel?.onMessage(handleChannelMessage);
     unsubscribe = $jukeAvailable.subscribe((available) => {
         if (available) {
             activate();
@@ -303,6 +377,8 @@ export const stop = (): void => {
     unsubscribe?.();
     unsubscribe = null;
     deactivate();
+    channel?.close();
+    channel = null;
     commandsRegistered = false;
     queue = Promise.resolve();
 };

@@ -5,7 +5,8 @@ import { clearCommands, registerCommands } from '../commands/command.registry';
 import { $searchFlow } from './searchFlow.store';
 import type { Recognizer, RecognizerHandlers } from '../speech/recognizer';
 import type { Speaker } from '../speech/speaker';
-import { ECHO_GRACE_MS, HANDOFF_POLL_MS, start, stop } from './juke.service';
+import type { JukeChannel, JukeChannelMessage } from './juke.channel';
+import { ECHO_GRACE_MS, HANDOFF_POLL_MS, start, stop, SYNC_TIMEOUT_MS } from './juke.service';
 import {
     $jukeActivity,
     $jukeHandoff,
@@ -81,6 +82,21 @@ const createSpeaker = (): Speaker => ({
     },
 });
 
+let posted: JukeChannelMessage[] = [];
+let receive: ((message: JukeChannelMessage) => void) | null = null;
+
+const createChannel = (): JukeChannel => ({
+    post: (message) => {
+        posted.push(message);
+    },
+    onMessage: (handler) => {
+        receive = handler;
+    },
+    close: () => {
+        receive = null;
+    },
+});
+
 const flush = async (): Promise<void> => {
     await Promise.resolve();
     await Promise.resolve();
@@ -117,6 +133,8 @@ describe('juke.service', () => {
         recognizers = [];
         speeches = [];
         speakerCancels = 0;
+        posted = [];
+        receive = null;
         mockShowWarning.mockReset();
         clearCommands();
         $jukeSpeechSupported.set(false);
@@ -165,12 +183,72 @@ describe('juke.service', () => {
         expect($jukeMode.get()).toBe('dialog');
         expect(speeches).toHaveLength(0);
 
+        vi.advanceTimersByTime(SYNC_TIMEOUT_MS);
         await hear('how are you');
         expect(speeches[0].text).toBe('juke.reply.smalltalk.howAreYou|Alan');
         await finishSpeaking();
 
         await hear('new search');
         expect(speeches[0].text).toBe('juke.reply.unknown');
+    });
+
+    it('stays deaf in the editor tab while the browse tab finishes its reply', async () => {
+        start({ createRecognizer, createSpeaker, createChannel });
+        $jukeSpeechSupported.set(true);
+        $config.setKey('aiEnabled', true);
+        $config.setKey('user', { getDisplayName: () => 'Alan' } as unknown as Principal);
+        $jukeHandoff.set(true);
+        expect(posted).toEqual([{ kind: 'sync' }]);
+
+        await hear('creating a new post called summer under posts');
+        expect(speeches).toHaveLength(0);
+
+        receive?.({ kind: 'state', speaking: true, recent: ['juke.reply.hello|Alan'] });
+        vi.advanceTimersByTime(SYNC_TIMEOUT_MS * 2);
+        await hear('creating a new post called summer under posts');
+        expect(speeches).toHaveLength(0);
+
+        receive?.({ kind: 'spoken', text: 'Creating a new post called Summer under Posts' });
+        vi.advanceTimersByTime(ECHO_GRACE_MS + 50);
+        await hear('called summer under posts');
+        await hear('juke reply hello alan');
+        expect(speeches).toHaveLength(0);
+
+        await hear('how are you');
+        expect(speeches[0].text).toBe('juke.reply.smalltalk.howAreYou|Alan');
+    });
+
+    it('starts listening in the editor tab when no other tab answers', async () => {
+        start({ createRecognizer, createSpeaker, createChannel });
+        $jukeSpeechSupported.set(true);
+        $config.setKey('aiEnabled', true);
+        $config.setKey('user', { getDisplayName: () => 'Alan' } as unknown as Principal);
+        $jukeHandoff.set(true);
+
+        vi.advanceTimersByTime(SYNC_TIMEOUT_MS - 1);
+        await hear('how are you');
+        expect(speeches).toHaveLength(0);
+
+        vi.advanceTimersByTime(1);
+        await hear('how are you');
+        expect(speeches[0].text).toBe('juke.reply.smalltalk.howAreYou|Alan');
+    });
+
+    it('tells a starting tab what it is saying and what it has said', async () => {
+        start({ createRecognizer, createSpeaker, createChannel });
+        makeAvailable();
+        await hear('hello juke');
+        posted = [];
+
+        receive?.({ kind: 'sync' });
+        expect(posted).toEqual([{ kind: 'state', speaking: true, recent: ['juke.reply.hello|Alan'] }]);
+
+        await finishSpeaking();
+        expect(posted[1]).toEqual({ kind: 'spoken', text: 'juke.reply.hello|Alan' });
+
+        posted = [];
+        receive?.({ kind: 'sync' });
+        expect(posted).toEqual([{ kind: 'state', speaking: false, recent: ['juke.reply.hello|Alan'] }]);
     });
 
     it('runs a reply follow-up after speaking and speaks what it answers', async () => {
