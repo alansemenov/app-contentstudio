@@ -20,6 +20,7 @@ const { mocks } = vi.hoisted(() => ({
         findContentByName: vi.fn(),
         leaveFilterMode: vi.fn(),
         expandInTree: vi.fn(),
+        waitForMovedEvent: vi.fn(),
         showSuccess: vi.fn(),
         showError: vi.fn(),
     },
@@ -65,6 +66,7 @@ vi.mock('../../../entities/task/task.service', () => ({ trackTask: mocks.trackTa
 vi.mock('./tree-reveal', () => ({
     leaveFilterMode: mocks.leaveFilterMode,
     expandInTree: mocks.expandInTree,
+    waitForMovedEvent: mocks.waitForMovedEvent,
 }));
 vi.mock('./content-lookup', async (importOriginal) => {
     const actual = await importOriginal<typeof import('./content-lookup')>();
@@ -269,6 +271,7 @@ describe('toolbar actions', () => {
         });
         expect(mocks.findContentByName).toHaveBeenCalledWith('blogs', { accept: expect.any(Function) });
         expect(mocks.moveContent).toHaveBeenCalledWith([post.getContentId()], blogs.getPath());
+        expect(mocks.waitForMovedEvent).toHaveBeenCalledWith([post.getId()], expect.any(Number));
         expect(mocks.leaveFilterMode).toHaveBeenCalledTimes(1);
         expect(mocks.expandInTree).toHaveBeenCalledWith(blogs.getPath());
         expect(mocks.showSuccess).toHaveBeenCalledWith('notify.items.moved.to.single|1 /superhero/blogs');

@@ -410,8 +410,10 @@ Acceptance:
   resolved items, not the selection.
 - Move: "Where do you want to move <name>?" → `moveTarget`. The answer is a new-parent name resolved with
   `findContentByName` + `canHoldChildren`, excluding the moved items and their descendants ("to the root" moves
-  to the root); a unique match moves the items with `moveContent`, then — if a filter is active — resets the filter
-  and waits for the tree to return (`$isFilterActive`, 3 s timeout) — and expands the destination in the tree
+  to the root); a unique match moves the items with `moveContent`, then waits for the server's move report on the
+  socket (`$contentMoved`, 3 s timeout — the tree rebuilds both parents from it, and expanding earlier is undone by
+  it), then — if a filter is active — resets the filter and waits for the tree to return (`$isFilterActive`, 3 s
+  timeout) — and expands the destination in the tree
   (`revealContentByPath` with `select: false, expandTarget: true`) and speaks done; not found / ambiguous keep
   the prompt; "cancel" cancels. "Move all" is refused.
 - Duplicate: children question → `duplicateChildren`. "Yes"/"no" leaves filter mode if active, duplicates with or

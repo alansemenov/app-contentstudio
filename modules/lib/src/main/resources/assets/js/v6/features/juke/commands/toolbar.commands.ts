@@ -17,7 +17,7 @@ import { canHoldChildren, findContentByName, spokenName } from './content-lookup
 import { openEditTabWithJuke } from './handoff';
 import { parseAlternatives } from './matching';
 import { parseTarget, resolveTarget, type TargetSpec } from './target';
-import { expandInTree, leaveFilterMode } from './tree-reveal';
+import { expandInTree, leaveFilterMode, waitForMovedEvent } from './tree-reveal';
 
 //
 // * Toolbar actions on a spoken target
@@ -261,6 +261,7 @@ export const moveTargetCommand: JukeCommand<MoveTargetArgs> = {
             }
         }
 
+        const requestedAt = Date.now();
         const { ok } = await runTask(
             moveContent(
                 flow.items.map((item) => item.getContentId()),
@@ -278,7 +279,12 @@ export const moveTargetCommand: JukeCommand<MoveTargetArgs> = {
             `${i18n(total > 1 ? 'notify.items.moved.to.multi' : 'notify.items.moved.to.single', total)} ${destinationLabel}`,
         );
         if (destination != null) {
-            // Shows the moved items in their new place without changing the selection.
+            // Shows the moved items in their new place without changing the selection,
+            // once the tree has taken the move in.
+            await waitForMovedEvent(
+                flow.items.map((item) => item.getId()),
+                requestedAt,
+            );
             await leaveFilterMode();
             await expandInTree(destination.getPath());
         }
