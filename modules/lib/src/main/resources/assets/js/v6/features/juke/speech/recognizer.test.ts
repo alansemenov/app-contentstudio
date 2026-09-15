@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRecognizer, INITIAL_BACKOFF_MS, RESUME_DELAY_MS } from './recognizer';
+import { createRecognizer, INITIAL_BACKOFF_MS, MAX_BACKOFF_MS, QUICK_END_MS, RESUME_DELAY_MS } from './recognizer';
 import type { JukeRecognition, JukeRecognitionErrorEvent, JukeRecognitionResultEvent } from './support';
 
 class FakeRecognition implements JukeRecognition {
@@ -101,6 +101,7 @@ describe('createRecognizer', () => {
 
     it('restarts with a fresh instance when recognition ends on its own', () => {
         create().start();
+        vi.advanceTimersByTime(QUICK_END_MS);
         latest().end();
         vi.advanceTimersByTime(0);
 
@@ -108,9 +109,36 @@ describe('createRecognizer', () => {
         expect(latest().started).toBe(1);
     });
 
+    it('backs off when a session ends at once, as while another tab holds the microphone', () => {
+        create().start();
+        latest().end();
+        vi.advanceTimersByTime(INITIAL_BACKOFF_MS - 1);
+        expect(FakeRecognition.instances).toHaveLength(1);
+        vi.advanceTimersByTime(1);
+        expect(FakeRecognition.instances).toHaveLength(2);
+
+        for (let i = 0; i < 5; i++) {
+            latest().end();
+            vi.runOnlyPendingTimers();
+        }
+        expect(FakeRecognition.instances).toHaveLength(7);
+
+        latest().end();
+        vi.advanceTimersByTime(MAX_BACKOFF_MS - 1);
+        expect(FakeRecognition.instances).toHaveLength(7);
+        vi.advanceTimersByTime(1);
+        expect(FakeRecognition.instances).toHaveLength(8);
+
+        latest().emitFinal(['hello juke']);
+        latest().end();
+        vi.advanceTimersByTime(0);
+        expect(FakeRecognition.instances).toHaveLength(9);
+    });
+
     it('backs off after network errors and resets after a result', () => {
         create().start();
         latest().emitError('network');
+        vi.advanceTimersByTime(QUICK_END_MS);
         latest().end();
         vi.advanceTimersByTime(INITIAL_BACKOFF_MS - 1);
         expect(FakeRecognition.instances).toHaveLength(1);
@@ -118,6 +146,7 @@ describe('createRecognizer', () => {
         expect(FakeRecognition.instances).toHaveLength(2);
 
         latest().emitError('network');
+        vi.advanceTimersByTime(QUICK_END_MS);
         latest().end();
         vi.advanceTimersByTime(INITIAL_BACKOFF_MS * 2);
         expect(FakeRecognition.instances).toHaveLength(3);

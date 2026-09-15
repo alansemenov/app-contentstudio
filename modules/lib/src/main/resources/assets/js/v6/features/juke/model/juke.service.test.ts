@@ -210,10 +210,10 @@ describe('juke.service', () => {
 
         await hear('hand over');
         expect(speeches[0].text).toBe('opening');
-        expect(latest().stopCalls).toBe(0);
+        expect(latest().stopCalls).toBe(1);
 
         await finishSpeaking();
-        expect(latest().stopCalls).toBe(1);
+        expect(latest().stopCalls).toBe(2);
         expect($jukeMode.get()).toBe('off');
         expect(recognizers).toHaveLength(1);
 

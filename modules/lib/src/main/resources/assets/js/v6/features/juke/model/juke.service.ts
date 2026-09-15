@@ -195,6 +195,12 @@ const handleTranscripts = (alternatives: string[]): void => {
     enqueue(async () => {
         let reply = await runStep(() => resolved.command.run(resolved.args, context), `command ${resolved.command.id}`);
         while (reply != null) {
+            // Chrome runs one recognition session at a time: let go of the
+            // microphone before the hand-over reply so the editor tab can take it
+            // while this tab is still speaking.
+            if (reply.handoff != null) {
+                recognizer?.stop();
+            }
             await respond(reply);
             if (reply.handoff != null) {
                 handOver(reply.handoff);

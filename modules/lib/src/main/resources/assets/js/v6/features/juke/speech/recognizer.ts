@@ -8,6 +8,11 @@ import { getRecognitionCtor, type JukeRecognition, type JukeRecognitionCtor } fr
 // recognizer is active. `pause`/`resume` bracket Juke's own speech so it does
 // not transcribe itself.
 //
+// Chrome runs one recognition session per profile: while another tab holds the
+// microphone, a new session ends at once without an error or a result. Such
+// ends back off like errors do, so the tab retries calmly until the other tab
+// lets go (e.g. the browse tab after handing over to the editor).
+//
 
 export type RecognizerHandlers = {
     // Final transcript alternatives for one utterance, best first.
@@ -34,6 +39,8 @@ export type Recognizer = {
 export const RESUME_DELAY_MS = 300;
 export const INITIAL_BACKOFF_MS = 1000;
 export const MAX_BACKOFF_MS = 10_000;
+// A session that ends sooner than this without a result never really ran.
+export const QUICK_END_MS = 1000;
 
 const DENIED_ERRORS = new Set(['not-allowed', 'service-not-allowed']);
 const BACKOFF_ERRORS = new Set(['network', 'audio-capture']);
@@ -52,6 +59,12 @@ export function createRecognizer(handlers: RecognizerHandlers, options: Recogniz
     let backoff = 0;
     let instance: JukeRecognition | null = null;
     let restartTimer: ReturnType<typeof setTimeout> | null = null;
+    let startedAt = 0;
+    let heardSomething = false;
+
+    const increaseBackoff = (): void => {
+        backoff = backoff === 0 ? INITIAL_BACKOFF_MS : Math.min(MAX_BACKOFF_MS, backoff * 2);
+    };
 
     const clearRestart = (): void => {
         if (restartTimer != null) {
@@ -99,6 +112,7 @@ export function createRecognizer(handlers: RecognizerHandlers, options: Recogniz
             }
             if (alternatives.length > 0) {
                 backoff = 0;
+                heardSomething = true;
                 handlers.onTranscripts(alternatives);
             }
         }
@@ -114,13 +128,21 @@ export function createRecognizer(handlers: RecognizerHandlers, options: Recogniz
             return;
         }
         if (BACKOFF_ERRORS.has(event.error)) {
-            backoff = backoff === 0 ? INITIAL_BACKOFF_MS : Math.min(MAX_BACKOFF_MS, backoff * 2);
+            increaseBackoff();
         }
     };
 
     const handleEnd = (): void => {
         instance = null;
-        console.info('[juke] recognition ended', active && !paused ? `restarting in ${backoff} ms` : 'stopped');
+        const endedAtOnce = !heardSomething && Date.now() - startedAt < QUICK_END_MS;
+        if (endedAtOnce && active && !paused) {
+            increaseBackoff();
+        }
+        console.info(
+            '[juke] recognition ended',
+            endedAtOnce ? 'at once (microphone busy?),' : '',
+            active && !paused ? `restarting in ${backoff} ms` : 'stopped',
+        );
         if (active && !paused) {
             scheduleRestart(backoff);
         }
@@ -140,6 +162,8 @@ export function createRecognizer(handlers: RecognizerHandlers, options: Recogniz
             recognition.onerror = handleError;
             recognition.onend = handleEnd;
             instance = recognition;
+            startedAt = Date.now();
+            heardSomething = false;
             recognition.start();
             console.info('[juke] recognition started');
         } catch (error) {
