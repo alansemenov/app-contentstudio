@@ -415,6 +415,18 @@ async function startContentWizard() {
     const wizard = new ContentWizardPanel(wizardParams, getTheme());
     setMode('wizard');
 
+    // Juke closes the tab itself once the user has answered about unsaved changes.
+    let skipUnsavedChangesPrompt = false;
+    const { setJukeEditorBridge } = await import('@enonic/lib-contentstudio/v6/features/juke');
+    setJukeEditorBridge({
+        hasUnsavedChanges: () => wizard.hasUnsavedChanges() && !wizard.isReadOnly(),
+        save: () => Promise.resolve(wizard.saveChanges()).then(() => undefined),
+        close: () => {
+            skipUnsavedChangesPrompt = true;
+            window.close();
+        },
+    });
+
     wizard.onDataLoaded((content: Content) => {
         let contentType = wizard.getContentType();
         if (!wizardParams.contentId || !dataPreloaded) {
@@ -442,7 +454,12 @@ async function startContentWizard() {
     });
 
     WindowDOM.get().onBeforeUnload((event: UIEvent) => {
-        if (wizard.isContentDeleted() || !connectionDetector?.isConnected() || !connectionDetector?.isAuthenticated()) {
+        if (
+            skipUnsavedChangesPrompt ||
+            wizard.isContentDeleted() ||
+            !connectionDetector?.isConnected() ||
+            !connectionDetector?.isAuthenticated()
+        ) {
             return;
         }
         if (wizard.hasUnsavedChanges() && !wizard.isReadOnly()) {

@@ -30,7 +30,7 @@ const { mocks } = vi.hoisted(() => ({
         setName: vi.fn(),
         makeNewContentRequest: vi.fn(),
         contentExistsByPath: vi.fn(),
-        openEditContentTab: vi.fn(),
+        openEditTabWithJuke: vi.fn(),
         revealContentByPath: vi.fn(),
         leaveFilterMode: vi.fn(),
         expandInTree: vi.fn(),
@@ -65,8 +65,9 @@ vi.mock('../../../../app/util/ContentHelper', () => ({
     ContentHelper: { makeNewContentRequest: mocks.makeNewContentRequest },
 }));
 
-vi.mock('../../../../app/util/ContentUrlHelper', () => ({
-    ContentUrlHelper: { openEditContentTab: mocks.openEditContentTab },
+vi.mock('./handoff', () => ({
+    openEditTabWithJuke: mocks.openEditTabWithJuke,
+    readJukeMarker: () => false,
 }));
 
 vi.mock('../../../../app/wizard/ContentEditParams', () => ({
@@ -242,6 +243,7 @@ describe('create dialog', () => {
         getPath: () => ({ toString: () => '/blogs/new', getParentPath: () => createdParent }),
     };
     const blogs = summary('blogs-id', 'Blogs', 'BLOGS_PATH');
+    const editorTab = { closed: false };
 
     beforeEach(() => {
         Object.values(mocks).forEach((mock) => mock.mockReset());
@@ -249,6 +251,7 @@ describe('create dialog', () => {
         clearCommands();
         registerCommands(...sessionCommands, ...smallTalkCommands, ...contentCommands);
 
+        mocks.openEditTabWithJuke.mockReturnValue(editorTab);
         mocks.fetchAllContentTypes.mockReturnValue(okAsync(allTypes));
         mocks.getAvailableContentTypes.mockResolvedValue([blog, article]);
         mocks.getActiveProject.mockReturnValue('PROJECT');
@@ -372,11 +375,15 @@ describe('create dialog', () => {
         expect(mocks.setDisplayName).toHaveBeenCalledWith('Summer news');
         expect(mocks.contentExistsByPath).toHaveBeenCalledWith('BLOGS_PATH/summer-news');
         expect(mocks.setName).toHaveBeenCalledWith('NAME:summer-news');
-        expect(mocks.openEditContentTab).toHaveBeenCalledWith({ contentId: 'new-id', displayAsNew: true });
+        expect(mocks.openEditTabWithJuke).toHaveBeenCalledWith({ contentId: 'new-id', displayAsNew: true });
         expect(mocks.leaveFilterMode).toHaveBeenCalledTimes(1);
         expect(mocks.expandInTree).toHaveBeenCalledWith(createdParent);
         expect(mocks.revealContentByPath).toHaveBeenCalledWith('/blogs/new');
-        expect(reply).toEqual({ say: 'juke.reply.create.creating|Blog Post|Summer news|Blogs', prompt: null });
+        expect(reply).toEqual({
+            say: 'juke.reply.create.creating|Blog Post|Summer news|Blogs',
+            prompt: null,
+            handoff: editorTab,
+        });
         expect($createFlow.get()).toBeNull();
     });
 
@@ -387,6 +394,20 @@ describe('create dialog', () => {
         const reply = await runResolved('summer news', 'createName');
 
         expect(mocks.setParent).toHaveBeenCalledWith('ROOT');
+        expect(reply).toEqual({
+            say: 'juke.reply.create.creatingRoot|Blog Post|Summer news',
+            prompt: null,
+            handoff: editorTab,
+        });
+    });
+
+    it('should not hand over when the editor tab could not be opened', async () => {
+        mocks.openEditTabWithJuke.mockReturnValue(null);
+        await runResolved('create a blog');
+        await runResolved('root', 'createParent');
+
+        const reply = await runResolved('summer news', 'createName');
+
         expect(reply).toEqual({ say: 'juke.reply.create.creatingRoot|Blog Post|Summer news', prompt: null });
     });
 
@@ -462,7 +483,7 @@ describe('create dialog', () => {
 
         const reply = await runResolved('summer news', 'createName');
 
-        expect(mocks.openEditContentTab).not.toHaveBeenCalled();
+        expect(mocks.openEditTabWithJuke).not.toHaveBeenCalled();
         expect(reply).toEqual({ say: 'juke.reply.create.failed|Blog Post', prompt: null });
         expect($createFlow.get()).toBeNull();
     });

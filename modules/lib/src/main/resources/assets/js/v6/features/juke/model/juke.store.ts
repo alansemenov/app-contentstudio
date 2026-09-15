@@ -1,6 +1,7 @@
 import { atom, computed } from 'nanostores';
 import { $config } from '../../../shared/config/config.store';
 import type { JukeContext, JukeMode, JukePrompt } from '../commands/command.types';
+import { readJukeMarker } from '../commands/handoff';
 import { isSpeechSupported } from '../speech/support';
 
 //
@@ -24,13 +25,17 @@ export const $jukeTranscript = atom<string>('');
 
 export const $jukeSpeechSupported = atom<boolean>(isSpeechSupported());
 
-// Juke may run only in the browse view, only when the Juke Operator app is
-// installed and started, and only where the browser exposes both recognition
-// and synthesis. On the browse page the server sets `aiEnabled` from the
-// operator's running state alone (the translator counts only in the wizard).
+// True in an editor tab that Juke opened from the browse view (URL marker).
+export const $jukeHandoff = atom<boolean>(readJukeMarker());
+
+// Juke may run in the browse view, or in an editor tab it was handed over to,
+// only when the Juke Operator app is installed and started, and only where the
+// browser exposes both recognition and synthesis. On the browse page the
+// server sets `aiEnabled` from the operator's running state alone (the
+// translator counts only in the wizard).
 export const $jukeAvailable = computed(
-    [$config, $jukeSpeechSupported],
-    (config, supported): boolean => supported && config.browseMode && config.aiEnabled,
+    [$config, $jukeSpeechSupported, $jukeHandoff],
+    (config, supported, handoff): boolean => supported && config.aiEnabled && (config.browseMode || handoff),
 );
 
 export const $isJukeVisible = computed($jukeMode, (mode) => mode === 'dialog');

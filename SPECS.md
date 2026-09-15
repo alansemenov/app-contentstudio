@@ -211,7 +211,8 @@ When Juke opens an edit tab from the browse tab — after creating a new content
 edit — a new instance of the voice dispatcher takes over in edit mode, and the voice analyser in the previous
 (browse) tab becomes inactive. The simplest way to achieve this is to shut Juke down in the browse tab after it
 has created a new content or opened one for edit. The browse tab says nothing about it: the user experience
-should carry on as if there is one assistant across all tabs.
+should carry on as if there is one assistant across all tabs. When the edit tab is closed, Juke in the browse
+tab picks the conversation up again without a greeting.
 
 **Goal:** Juke in edit mode understands a first command.
 

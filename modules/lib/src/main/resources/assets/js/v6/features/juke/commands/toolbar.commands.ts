@@ -5,6 +5,7 @@ import type { ResultAsync } from 'neverthrow';
 import { PreviewActionHelper } from '../../../../app/action/PreviewActionHelper';
 import type { ContentSummary } from '../../../../app/content/ContentSummary';
 import { ContentUrlHelper } from '../../../../app/util/ContentUrlHelper';
+import { ContentEditParams } from '../../../../app/wizard/ContentEditParams';
 import { archiveContent } from '../../../entities/content/api/delete.api';
 import { duplicateContent } from '../../../entities/content/api/duplicate.api';
 import { moveContent } from '../../../entities/content/api/move.api';
@@ -13,6 +14,7 @@ import type { AppError } from '../../../shared/api/errors';
 import { $actionFlow, resetActionFlow, startActionFlow, type ActionFlow } from '../model/actionFlow.store';
 import type { JukeCommand, JukeContext, JukeReply } from './command.types';
 import { canHoldChildren, findContentByName, spokenName } from './content-lookup';
+import { openEditTabWithJuke } from './handoff';
 import { parseAlternatives } from './matching';
 import { parseTarget, resolveTarget, type TargetSpec } from './target';
 import { expandInTree, leaveFilterMode } from './tree-reveal';
@@ -139,14 +141,15 @@ export const toolbarCommand: JukeCommand<ToolbarArgs> = {
         const { items, label } = resolution;
 
         switch (args.action) {
-            case 'edit':
+            case 'edit': {
+                // A single editor takes the conversation over; several open plainly.
+                if (items.length === 1) {
+                    const handoff = openEditTabWithJuke(ContentEditParams.create(items[0].getContentId()).build());
+                    return { say: i18n('juke.reply.edit.opening', label), handoff: handoff ?? undefined };
+                }
                 items.forEach((item) => ContentUrlHelper.openEditContentTab(item.getContentId()));
-                return {
-                    say:
-                        items.length === 1
-                            ? i18n('juke.reply.edit.opening', label)
-                            : i18n('juke.reply.edit.openingMany', items.length),
-                };
+                return { say: i18n('juke.reply.edit.openingMany', items.length) };
+            }
             case 'preview':
                 // Whether an item renders is only known by rendering it (most content
                 // uses a page template and has no page of its own), so every target is

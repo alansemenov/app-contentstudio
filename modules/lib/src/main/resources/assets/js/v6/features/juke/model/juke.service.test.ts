@@ -5,8 +5,15 @@ import { clearCommands, registerCommands } from '../commands/command.registry';
 import { $searchFlow } from './searchFlow.store';
 import type { Recognizer, RecognizerHandlers } from '../speech/recognizer';
 import type { Speaker } from '../speech/speaker';
-import { ECHO_GRACE_MS, start, stop } from './juke.service';
-import { $jukeActivity, $jukeMode, $jukePrompt, $jukeSpeechSupported, $jukeTranscript } from './juke.store';
+import { ECHO_GRACE_MS, HANDOFF_POLL_MS, start, stop } from './juke.service';
+import {
+    $jukeActivity,
+    $jukeHandoff,
+    $jukeMode,
+    $jukePrompt,
+    $jukeSpeechSupported,
+    $jukeTranscript,
+} from './juke.store';
 
 const { mockShowWarning } = vi.hoisted(() => ({ mockShowWarning: vi.fn() }));
 
@@ -113,6 +120,7 @@ describe('juke.service', () => {
         mockShowWarning.mockReset();
         clearCommands();
         $jukeSpeechSupported.set(false);
+        $jukeHandoff.set(false);
         $config.setKey('browseMode', false);
         $config.setKey('aiEnabled', false);
     });
@@ -144,6 +152,81 @@ describe('juke.service', () => {
         $config.setKey('aiEnabled', true);
         expect(recognizers).toHaveLength(0);
         expect($jukeMode.get()).toBe('off');
+    });
+
+    it('continues the dialog in an editor tab it was handed over to, with editor commands only', async () => {
+        start({ createRecognizer, createSpeaker });
+        $jukeSpeechSupported.set(true);
+        $config.setKey('aiEnabled', true);
+        $config.setKey('user', { getDisplayName: () => 'Alan' } as unknown as Principal);
+        $jukeHandoff.set(true);
+
+        expect(recognizers).toHaveLength(1);
+        expect($jukeMode.get()).toBe('dialog');
+        expect(speeches).toHaveLength(0);
+
+        await hear('how are you');
+        expect(speeches[0].text).toBe('juke.reply.smalltalk.howAreYou|Alan');
+        await finishSpeaking();
+
+        await hear('new search');
+        expect(speeches[0].text).toBe('juke.reply.unknown');
+    });
+
+    it('runs a reply follow-up after speaking and speaks what it answers', async () => {
+        start({ createRecognizer, createSpeaker });
+        makeAvailable();
+        const after = vi.fn().mockResolvedValue({ say: 'follow-up' });
+        registerCommands({
+            id: 'test.after',
+            modes: ['dialog'],
+            match: (text) => (text === 'do it' ? true : null),
+            run: () => ({ say: 'doing it', after }),
+        });
+        await hear('hello juke');
+        await finishSpeaking();
+
+        await hear('do it');
+        expect(speeches[0].text).toBe('doing it');
+        expect(after).not.toHaveBeenCalled();
+
+        await finishSpeaking();
+        expect(after).toHaveBeenCalledTimes(1);
+        expect(speeches[0].text).toBe('follow-up');
+    });
+
+    it('goes quiet after handing over and resumes the dialog when that tab closes', async () => {
+        start({ createRecognizer, createSpeaker });
+        makeAvailable();
+        const editorTab = { closed: false };
+        registerCommands({
+            id: 'test.handoff',
+            modes: ['dialog'],
+            match: (text) => (text === 'hand over' ? true : null),
+            run: () => ({ say: 'opening', handoff: editorTab }),
+        });
+        await hear('hello juke');
+        await finishSpeaking();
+
+        await hear('hand over');
+        expect(speeches[0].text).toBe('opening');
+        expect(latest().stopCalls).toBe(0);
+
+        await finishSpeaking();
+        expect(latest().stopCalls).toBe(1);
+        expect($jukeMode.get()).toBe('off');
+        expect(recognizers).toHaveLength(1);
+
+        vi.advanceTimersByTime(HANDOFF_POLL_MS * 3);
+        expect(recognizers).toHaveLength(1);
+
+        editorTab.closed = true;
+        vi.advanceTimersByTime(HANDOFF_POLL_MS);
+        expect(recognizers).toHaveLength(2);
+        expect($jukeMode.get()).toBe('dialog');
+
+        await hear('how are you');
+        expect(speeches[0].text).toBe('juke.reply.smalltalk.howAreYou|Alan');
     });
 
     it('ignores everything but the wake phrase while idle', async () => {

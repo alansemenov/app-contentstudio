@@ -11,6 +11,8 @@ export { $isJukeVisible, $jukeAvailable } from './model/juke.store';
 
 // Bootstrap
 export { start as startJukeService, stop as stopJukeService } from './model/juke.service';
+export { setJukeEditorBridge } from './model/editorBridge.store';
+export type { JukeEditorBridge } from './model/editorBridge.store';
 
 // UI
 export { JukeWidget } from './ui/JukeWidget';

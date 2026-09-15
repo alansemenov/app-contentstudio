@@ -11,6 +11,7 @@ const { mocks } = vi.hoisted(() => ({
     mocks: {
         resolveTarget: vi.fn(),
         openEditContentTab: vi.fn(),
+        openEditTabWithJuke: vi.fn(),
         openWindows: vi.fn(),
         archiveContent: vi.fn(),
         moveContent: vi.fn(),
@@ -40,6 +41,15 @@ vi.mock('./target', async (importOriginal) => {
 
 vi.mock('../../../../app/util/ContentUrlHelper', () => ({
     ContentUrlHelper: { openEditContentTab: mocks.openEditContentTab },
+}));
+
+vi.mock('../../../../app/wizard/ContentEditParams', () => ({
+    ContentEditParams: { create: (contentId: unknown) => ({ build: () => ({ contentId }) }) },
+}));
+
+vi.mock('./handoff', () => ({
+    openEditTabWithJuke: mocks.openEditTabWithJuke,
+    readJukeMarker: () => false,
 }));
 
 vi.mock('../../../../app/action/PreviewActionHelper', () => ({
@@ -180,13 +190,23 @@ describe('toolbar actions', () => {
         expect(await say('edit x')).toEqual({ say: 'juke.reply.target.notFound|x' });
     });
 
-    it('should open one edit tab per item', async () => {
+    it('should hand over to a single editor tab and open several plainly', async () => {
+        const editorTab = { closed: false };
+        mocks.openEditTabWithJuke.mockReturnValue(editorTab);
+        expect(await say('edit summer news')).toEqual({
+            say: 'juke.reply.edit.opening|Summer news',
+            handoff: editorTab,
+        });
+        expect(mocks.openEditTabWithJuke).toHaveBeenCalledWith({ contentId: post.getContentId() });
+        expect(mocks.openEditContentTab).not.toHaveBeenCalled();
+
+        mocks.openEditTabWithJuke.mockReturnValue(null);
         expect(await say('edit summer news')).toEqual({ say: 'juke.reply.edit.opening|Summer news' });
-        expect(mocks.openEditContentTab).toHaveBeenCalledWith(post.getContentId());
 
         mocks.resolveTarget.mockResolvedValue(itemsResolution([post, folder]));
         expect(await say('edit all')).toEqual({ say: 'juke.reply.edit.openingMany|2' });
-        expect(mocks.openEditContentTab).toHaveBeenCalledTimes(3);
+        expect(mocks.openEditContentTab).toHaveBeenCalledTimes(2);
+        expect(mocks.openEditTabWithJuke).toHaveBeenCalledTimes(2);
     });
 
     it('should open a preview for every targeted item', async () => {

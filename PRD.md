@@ -425,7 +425,7 @@ Acceptance:
 - "Cancel" and "let's try again" work in every prompt as in the create dialog.
 - Toolbar actions do not change the selection; the mouse selection stays whatever it was.
 
-### Milestone 5 — Voice commands in edit mode (planned 2026-09-15)
+### Milestone 5 — Voice commands in edit mode (done 2026-09-15)
 
 Goal: an edit tab opened by Juke gets its own Juke; the browse tab that opened it goes quiet; first command
 is "close the tab".
@@ -439,42 +439,53 @@ Phrases:
 - No hand-off phrase: the browse tab goes silent without a word, so it feels like one assistant across tabs.
 
 Design:
-- Hand-over marker: edit URLs Juke opens get a `juke=1` query parameter (through `ContentEditParams` →
-  `ContentUrlHelper.generateEditContentUrl`, which already carries `displayAsNew`/`localized`). The wizard reads
-  it at startup; only then does Juke start in that tab. Manually opened editors stay silent for now.
-- Availability in wizard mode: `$jukeAvailable` becomes `aiEnabled && (browseMode || jukeHandoff)` where
-  `jukeHandoff` is the URL marker. Note `aiEnabled` in the wizard is operator *or* translator running; the
-  operator requirement stays: the wizard config exposes which plugins are enabled, or the host's
-  `$aiRegisteredPlugins` is read once the boundary question is settled (see M6).
-- Browse tab shutdown: after `openEditContentTab` in the create dialog and the edit action, the browse tab's
-  Juke stops silently — the create/edit reply is the last thing it says — via `stopJukeService()` (microphone
-  released, mode `off`, widget hidden). A page reload of the browse tab starts Juke again. "Preview" does not
-  hand over.
+- Hand-over marker: edit URLs Juke opens get a `juke=1` query parameter (`commands/handoff.ts`:
+  `openEditTabWithJuke` appends it to `ContentUrlHelper.generateEditContentUrl` and opens the tab under the
+  wizard's tab name through the shared `openTabOrFocusExisting`). The wizard reads it at startup
+  (`$jukeHandoff`); only then does Juke start in that tab. Manually opened editors stay silent for now. An
+  editor that was already open without the marker is focused but not handed over (its URL lacks the marker),
+  so the browse tab keeps talking.
+- Availability in wizard mode: `$jukeAvailable` is `speech && aiEnabled && (browseMode || jukeHandoff)`. Note
+  `aiEnabled` in the wizard is operator *or* translator running; the marker is only ever set by a Juke that
+  required the operator, so no extra check is made.
+- Browse tab hand-over: the create-name step and a single-item "edit" return their reply with
+  `handoff: <the opened Window>`; after speaking it the service releases the microphone and hides the widget
+  (mode `off`) without a word, then polls the window every second and, once it is closed, starts listening
+  again straight in `dialog` mode — so the conversation continues in the browse tab where it left off. "Edit"
+  on several items opens plain tabs; "preview" does not hand over.
 - Edit-mode registry: session commands (hello/goodbye/cancel) and small talk are reused; browse-only commands
   (search, tree, project, toolbar, create) are not registered in wizard mode. New `tab.commands.ts`:
-  - "close the tab" / "close this tab" / "close the editor": if the wizard has no unsaved changes
-    (`$wizardToolbar` dirty state / the wizard's `hasUnsavedChanges`), say "Closing the tab." and close.
-    Otherwise ask the unsaved phrase and enter prompt `closeTab`: "yes" says "Saving changes and closing the
-    tab.", saves through the wizard's save action, waits for the save to finish, then closes; "no" says
-    "Closing the tab." and closes without saving, suppressing the wizard's own beforeunload prompt for that
-    close; "cancel" leaves the tab open. Save failure: save-failed reply, tab stays open.
-  - "save changes and close the tab" / "save and close": says "Saving changes and closing the tab.", saves
-    without asking, then closes.
+  - Editor bridge: the wizard lives in the pages layer and the legacy panel, out of reach for a feature, so
+    `main.ts` (`startContentWizard`) injects a `JukeEditorBridge` — `hasUnsavedChanges()` (wizard dirty and not
+    read-only), `save()` (the wizard's `saveChanges`), `close()` (sets a flag that skips the wizard's
+    beforeunload prompt, then `window.close()`) — through `setJukeEditorBridge` exported from the feature.
+  - "close the tab" / "close this tab" / "close the editor|window|wizard": if the bridge reports no unsaved
+    changes, say "Closing the tab." and close. Otherwise ask the unsaved phrase and enter prompt `closeTab`:
+    "yes" says "Saving changes and closing the tab.", saves, waits for the save to finish, then closes; "no"
+    says "Closing the tab." and closes without saving and without the browser prompt; anything else repeats the
+    question; "cancel" leaves the tab open. Save failure: save-failed reply, tab stays open.
+  - "save (the changes) and close (the tab)" / "save and close": says "Saving changes and closing the tab.",
+    saves without asking, then closes. Also accepted as the answer to the unsaved question.
   - Confirmations are spoken *before* the action runs, because closing the tab would cut the speech off.
-    `JukeReply` gets an optional `then: () => Promise<void>` that the service runs after the reply has been
-    spoken (and after applying the reply's prompt/mode); the tab commands put the save and the close there.
-  - Closing uses `window.close()`, allowed because the tab was opened by script; otherwise the cannot-close reply.
+    `JukeReply` has an optional `after` hook (not `then`, which would make a reply a thenable) that the service
+    runs after the reply has been spoken and its prompt/mode applied; it may answer with a follow-up reply
+    (save failed, cannot close) that is spoken in turn. Failures and timeouts in the hook get the generic
+    failure reply like a command would.
+  - Closing uses `window.close()`, allowed because the tab was opened by script; if the tab is still there
+    300 ms later (a manually opened tab with the marker), the cannot-close reply.
 - Widget mount: `JukeWidget` is added to `WizardAppShell` next to `BrowseAppShell`. The Juke service already
-  starts from `AppElement.initialize()` for both modes; in wizard mode the dialog opens immediately in `dialog`
-  mode (no "Hello, Juke" needed after a hand-over) and the greeting is skipped.
-- The wizard's beforeunload prompt is bypassed only for a close the user has just answered "no" to; any other
-  navigation keeps it.
+  starts from `AppElement.initialize()` for both modes; commands are registered on activation per mode
+  (`allCommands` in browse, `editorCommands` = session + small talk + tab in the editor); in the editor the
+  dialog is open from the start (no "Hello, Juke" and no greeting after a hand-over).
+- The wizard's beforeunload prompt is bypassed only for a close Juke performs; any other navigation keeps it.
 
 Acceptance: "create a post" flow ends with the editor tab open, Juke silent in the browse tab (no hand-off
 line) and active in the editor; "close the tab" closes a clean editor at once; with unsaved changes it asks,
 "yes" saves and closes, "no" closes without the browser prompt; "save changes and close the tab" saves and closes
-without asking. Each close is preceded by the spoken confirmation, and the close waits for the speech to end. Unit tests for the URL marker, availability gate, registry composition per mode, the dirty
-check and the three close paths.
+without asking. Each close is preceded by the spoken confirmation, and the close waits for the speech to end.
+Closing the editor (by voice or by hand) brings the browse tab's Juke back in dialog mode. Unit tests for the
+URL marker and hand-over helper, availability gate, registry composition per mode, the follow-up hook, the
+hand-over/resume cycle, the dirty check and the three close paths.
 
 ### Milestone 6 — Suggestions from Juke Content Operator (planned 2026-09-15)
 

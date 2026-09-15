@@ -8,7 +8,6 @@ import { ContentPath } from '../../../../app/content/ContentPath';
 import type { ContentSummary } from '../../../../app/content/ContentSummary';
 import { ContentHelper } from '../../../../app/util/ContentHelper';
 import { ContentTypesHelper } from '../../../../app/util/ContentTypesHelper';
-import { ContentUrlHelper } from '../../../../app/util/ContentUrlHelper';
 import { ContentEditParams } from '../../../../app/wizard/ContentEditParams';
 import { revealContentByPath } from '../../../entities/content';
 import { contentExistsByPath } from '../../../entities/content/api/contentExists.api';
@@ -24,6 +23,7 @@ import {
 } from '../model/createFlow.store';
 import type { JukeCommand, JukeReply } from './command.types';
 import { canHoldChildren, findContentByName, spokenName } from './content-lookup';
+import { openEditTabWithJuke } from './handoff';
 import { expandInTree, leaveFilterMode } from './tree-reveal';
 import { bestUniqueMatch, parseAlternatives } from './matching';
 
@@ -233,10 +233,11 @@ export const createNameCommand: JukeCommand<CreateNameArgs> = {
         }
         const title = flow.type.getTitle();
         const displayName = toDisplayName(args.name);
+        let handoff: Window | null = null;
 
         try {
             const content = await createContent(flow, displayName);
-            ContentUrlHelper.openEditContentTab(
+            handoff = openEditTabWithJuke(
                 ContentEditParams.create(content.getContentId()).setDisplayAsNew(true).build(),
             );
             // Shows the new item: leave the filtered list, expand the parent, then
@@ -258,6 +259,7 @@ export const createNameCommand: JukeCommand<CreateNameArgs> = {
                     ? i18n('juke.reply.create.creating', title, displayName, parentName)
                     : i18n('juke.reply.create.creatingRoot', title, displayName),
             prompt: null,
+            handoff: handoff ?? undefined,
         };
     },
 };

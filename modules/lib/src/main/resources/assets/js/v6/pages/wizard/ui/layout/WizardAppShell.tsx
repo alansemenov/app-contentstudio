@@ -12,6 +12,7 @@ import { SortDialog } from '../../../../features/sort/ui/SortDialog';
 import { UnpublishDialog } from '../../../../features/unpublish/ui/UnpublishDialog';
 import { PermissionsDialog } from '../../../../features/permissions/ui/PermissionsDialog';
 import { NewContentDialog } from '../../../../features/new-content/ui/NewContentDialog';
+import { JukeWidget } from '../../../../features/juke/ui/JukeWidget';
 import { DetachedPageComponentsView } from './detached-page-components/DetachedPageComponentsView';
 import { PageResetDialog } from './PageResetDialog';
 
@@ -34,6 +35,7 @@ export const WizardAppShell = (): ReactElement => {
             <SortDialog />
             <PageResetDialog />
             <DetachedPageComponentsView />
+            <JukeWidget />
         </>
     );
 };

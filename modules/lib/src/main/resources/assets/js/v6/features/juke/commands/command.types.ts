@@ -16,7 +16,8 @@ export type JukePrompt =
     | 'showResults'
     | 'confirmDelete'
     | 'moveTarget'
-    | 'duplicateChildren';
+    | 'duplicateChildren'
+    | 'closeTab';
 
 export type JukeContext = {
     mode: JukeMode;
@@ -28,10 +29,20 @@ export type JukeContext = {
     alternatives?: readonly string[];
 };
 
+// The tab Juke hands the conversation over to; only its closed state is read.
+export type JukeHandoff = Pick<Window, 'closed'>;
+
 export type JukeReply = {
     say: string;
     mode?: JukeMode;
     prompt?: JukePrompt | null;
+    // Runs once the reply has been spoken, for actions that would cut the
+    // speech off (closing the tab). May answer with a follow-up reply. Not
+    // named "then" so a reply is never mistaken for a thenable.
+    after?: () => Promise<JukeReply | undefined> | JukeReply | undefined;
+    // Hands the conversation over to another tab: this tab's Juke goes quiet
+    // after the reply and resumes when that tab is closed.
+    handoff?: JukeHandoff;
 };
 
 export type JukeCommand<Args = unknown> = {

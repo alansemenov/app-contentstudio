@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { allCommands } from './all.commands';
+import { allCommands, editorCommands } from './all.commands';
 import { clearCommands, registerCommands, resolveCommand } from './command.registry';
 import type { JukeContext } from './command.types';
 
@@ -58,6 +58,38 @@ describe('allCommands registration order', () => {
 
     it('should have unique command ids', () => {
         const ids = allCommands.map((command) => command.id);
+        expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('should leave tab commands out of the browse view', () => {
+        expect(allCommands.some((command) => command.id.startsWith('tab.'))).toBe(false);
+    });
+});
+
+describe('editorCommands', () => {
+    beforeEach(() => {
+        clearCommands();
+        registerCommands(...editorCommands);
+    });
+
+    it.each([
+        ['close the tab', 'tab.close'],
+        ['save changes and close the tab', 'tab.saveAndClose'],
+        ['how are you', 'smalltalk.howAreYou'],
+        ['cancel', 'session.cancel'],
+        ['goodbye juke', 'session.goodbye'],
+    ])('should resolve "%s" to %s', (text, id) => {
+        expect(resolveCommand([text], context())?.command.id).toBe(id);
+    });
+
+    it('should leave browse-only commands out', () => {
+        expect(resolveCommand(['new search'], context())).toBeNull();
+        expect(resolveCommand(['create a blog'], context())).toBeNull();
+        expect(resolveCommand(['delete the top one'], context())).toBeNull();
+    });
+
+    it('should have unique command ids', () => {
+        const ids = editorCommands.map((command) => command.id);
         expect(new Set(ids).size).toBe(ids.length);
     });
 });

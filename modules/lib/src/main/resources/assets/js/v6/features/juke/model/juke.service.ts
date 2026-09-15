@@ -1,8 +1,8 @@
 import { showWarning } from '@enonic/lib-admin-ui/notify/MessageBus';
 import { i18n } from '@enonic/lib-admin-ui/util/Messages';
 import { registerCommands, resolveCommand } from '../commands/command.registry';
-import type { JukeReply } from '../commands/command.types';
-import { allCommands } from '../commands/all.commands';
+import type { JukeHandoff, JukeReply } from '../commands/command.types';
+import { allCommands, editorCommands } from '../commands/all.commands';
 import { stripJukeAddress } from '../commands/session.commands';
 import { isEchoOf, stripEchoPrefix } from '../speech/echo';
 import { normalizeTranscript } from '../speech/normalize';
@@ -12,6 +12,7 @@ import {
     type RecognizerHandlers,
 } from '../speech/recognizer';
 import { createSpeaker as defaultCreateSpeaker, type Speaker } from '../speech/speaker';
+import { $config } from '../../../shared/config/config.store';
 import { resetActionFlow } from './actionFlow.store';
 import { resetCreateFlow } from './createFlow.store';
 import { resetSearchFlow } from './searchFlow.store';
@@ -29,8 +30,10 @@ import {
 // * Juke service
 //
 // Starts the microphone while Juke is available, routes transcripts to the
-// command registry and speaks replies. Recognition is paused while speaking so
-// Juke does not hear itself. Started explicitly from the app root.
+// command registry and speaks replies. Recognition keeps running while Juke
+// speaks; its own words are filtered out. Started explicitly from the app root.
+// In an editor tab opened by Juke the dialog is open from the start, and the
+// browse tab that handed over stays quiet until that tab is closed.
 //
 
 export type JukeServiceDeps = {
@@ -42,6 +45,9 @@ let unsubscribe: (() => void) | null = null;
 let recognizer: Recognizer | null = null;
 let speaker: Speaker | null = null;
 let deniedNotified = false;
+let commandsRegistered = false;
+// Set while the conversation is in another tab.
+let handoffTimer: ReturnType<typeof setInterval> | null = null;
 let deps: Required<JukeServiceDeps> = {
     createRecognizer: (handlers) => defaultCreateRecognizer(handlers),
     createSpeaker: () => defaultCreateSpeaker(),
@@ -65,6 +71,10 @@ let recentSpoken: string[] = [];
 // A command that neither answers nor fails within this time is treated as failed,
 // so Juke never falls silent with the queue blocked behind it.
 export const COMMAND_TIMEOUT_MS = 20_000;
+
+// How often the browse tab checks whether the editor tab it handed over to is
+// still open.
+export const HANDOFF_POLL_MS = 1000;
 
 const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
     new Promise<T>((resolve, reject) => {
@@ -110,6 +120,19 @@ const respond = async (reply: JukeReply): Promise<void> => {
 
 // Returns the alternatives with Juke's own words removed, or null when nothing
 // but echo was heard.
+// Runs a command step, answering with the failure reply instead of throwing.
+const runStep = async (
+    step: () => Promise<JukeReply | null | undefined> | JukeReply | null | undefined,
+    label: string,
+): Promise<JukeReply | null> => {
+    try {
+        return (await withTimeout(Promise.resolve(step()), COMMAND_TIMEOUT_MS)) ?? null;
+    } catch (error) {
+        console.error(`[juke] ${label} failed`, error);
+        return { say: i18n('juke.reply.failed') };
+    }
+};
+
 const withoutSelfEcho = (normalized: readonly string[]): string[] | null => {
     if (speaking || Date.now() - speechEndedAt < ECHO_GRACE_MS) {
         return null;
@@ -170,23 +193,26 @@ const handleTranscripts = (alternatives: string[]): void => {
     }
 
     enqueue(async () => {
-        let reply: JukeReply | null;
-        try {
-            reply = await withTimeout(
-                Promise.resolve(resolved.command.run(resolved.args, context)),
-                COMMAND_TIMEOUT_MS,
-            );
-        } catch (error) {
-            console.error(`[juke] command ${resolved.command.id} failed`, error);
-            reply = { say: i18n('juke.reply.failed') };
-        }
-        if (reply != null) {
+        let reply = await runStep(() => resolved.command.run(resolved.args, context), `command ${resolved.command.id}`);
+        while (reply != null) {
             await respond(reply);
+            if (reply.handoff != null) {
+                handOver(reply.handoff);
+            }
+            reply = reply.after == null ? null : await runStep(reply.after, `command ${resolved.command.id} follow-up`);
         }
     });
 };
 
+const stopHandoffWatch = (): void => {
+    if (handoffTimer != null) {
+        clearInterval(handoffTimer);
+        handoffTimer = null;
+    }
+};
+
 const deactivate = (): void => {
+    stopHandoffWatch();
     recognizer?.stop();
     recognizer = null;
     speaker?.cancel();
@@ -208,9 +234,15 @@ const handleDenied = (): void => {
     }
 };
 
+const isHandoffTab = (): boolean => !$config.get().browseMode;
+
 const activate = (): void => {
     if (recognizer != null) {
         return;
+    }
+    if (!commandsRegistered) {
+        registerCommands(...(isHandoffTab() ? editorCommands : allCommands));
+        commandsRegistered = true;
     }
     speaker = deps.createSpeaker();
     recognizer = deps.createRecognizer({ onTranscripts: handleTranscripts, onDenied: handleDenied });
@@ -219,7 +251,26 @@ const activate = (): void => {
         return;
     }
     recognizer.start();
-    setJukeMode('idle');
+    // After a hand-over the conversation simply continues in the new tab.
+    setJukeMode(isHandoffTab() ? 'dialog' : 'idle');
+};
+
+// Goes quiet while the conversation continues in the other tab, and picks it up
+// again, still in dialog mode, once that tab is closed.
+const handOver = (target: JukeHandoff): void => {
+    console.info('[juke] handing over to the editor tab');
+    deactivate();
+    handoffTimer = setInterval(() => {
+        if (!target.closed) {
+            return;
+        }
+        stopHandoffWatch();
+        if ($jukeAvailable.get()) {
+            console.info('[juke] editor tab closed, resuming');
+            activate();
+            setJukeMode('dialog');
+        }
+    }, HANDOFF_POLL_MS);
 };
 
 /**
@@ -230,7 +281,6 @@ export const start = (overrides: JukeServiceDeps = {}): void => {
         return;
     }
     deps = { ...deps, ...overrides };
-    registerCommands(...allCommands);
     unsubscribe = $jukeAvailable.subscribe((available) => {
         if (available) {
             activate();
@@ -247,5 +297,6 @@ export const stop = (): void => {
     unsubscribe?.();
     unsubscribe = null;
     deactivate();
+    commandsRegistered = false;
     queue = Promise.resolve();
 };
