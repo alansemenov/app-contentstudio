@@ -723,6 +723,20 @@ by-voice verification):
 | 8 — Juke Voice Assistant app | 10–14 h | 40–60 | 90–130M | Parse/action split of ~3.3k lines and ~3.5k test lines, ~40-method host API, new repo and build, load hooks, full regression pass by voice across M1–7. About the size of M1–5 together. |
 | Total M6–M8 | 15–21 h | 60–85 | 135–195M | |
 
+Whole project (measured M1–5 plus estimated M6–8):
+
+| | Active time | Calendar time | Commits | Output tokens | Tokens processed |
+|---|---|---|---|---|---|
+| Milestones 1–5 (measured) | ~10 h | 5 days | 64 | ~0.45M | 80–120M |
+| Milestones 6–8 (estimated) | 15–21 h | 6–9 working days at the same pace | 60–85 | 0.6–0.9M | 135–195M |
+| Entire project | 25–31 h | 11–14 working days | 125–150 | 1.0–1.4M | 215–315M |
+
+Calendar time assumes the pace so far: about two hours of session time per working day, with the user testing
+by voice between steps. Compressed to full days the same work fits in about four to five working days. Had this
+estimate been made from the PRD before implementation started, with today's knowledge of the voice testing loop
+and the extraction, it would have read 25–30 hours and 200–300M tokens; without that knowledge it would have read
+about a third of that.
+
 The M8 estimate assumes the app repo is cloned from the operator's skeleton and that the host API is carved
 inside CS first (step 1), which keeps every existing test green while the boundary is drawn; doing the move
 before the split would roughly double the regression work.
