@@ -263,3 +263,20 @@ without opening the translator's modal dialog.
 **Expected action:** The voice analyser in Content Studio communicates with the Juke Translator and the
 requested fields (or the whole content) are translated into the requested language.
 
+## Milestone 8 — Juke Voice Assistant application
+
+When all the functionality is in place, extract it to a separate application under the Juke umbrella, similar to
+Juke Content Operator and Juke Translator. The application is called "Juke Voice Assistant".
+
+**Requirements:**
+
+- Installing and starting the application in XP enables all the voice functionality implemented in this project
+  (milestones 1–7) in Content Studio. Without the application, Content Studio has no voice features.
+- The features from milestones 6 and 7 additionally require the Juke Content Operator and Juke Translator
+  applications, as before.
+- The application follows the conventions of the other Juke applications: XP application key under
+  `com.enonic.app.ai.*`, Juke branding, its own repository, build and tests.
+- Content Studio keeps only what the application needs from it: a stable, typed integration surface (the way the
+  AI plugin protocol serves the operator and translator) and the hooks that load the application in the browse
+  and edit views.
+

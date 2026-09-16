@@ -9,14 +9,15 @@ Juke is a voice assistant inside Content Studio's browse view. It listens contin
 microphone, wakes on "Hello, Juke", executes editorial actions the UI already supports (switch project, create
 content, search, select, edit, delete, move, duplicate, preview) and answers by voice. It is only active when the
 Juke Operator app (`com.enonic.app.ai.contentoperator`) is installed and running; in milestones 1–4 the operator
-is not used functionally, only as a gate.
+is not used functionally, only as a gate. Milestone 8 moves the voice assistant out of Content Studio into its
+own application, "Juke Voice Assistant", which then becomes the gate.
 
 ## 2. Decisions
 
 | Topic | Decision | Rationale |
 |---|---|---|
 | Speech to text / text to speech | Browser Web Speech API: `SpeechRecognition` (webkit-prefixed) and `speechSynthesis` | No backend, no credentials. Content Studio has no LLM access; the operator's Gemini config stays in the operator. |
-| Command understanding | Deterministic command mapper inside Content Studio (`v6/features/juke`). No MCP, no LLM. | User clarification: "mcp server" meant a voice-command-to-action module living in CS. |
+| Command understanding | Deterministic command mapper inside Content Studio (`v6/features/juke`). No MCP, no LLM. | User clarification: "mcp server" meant a voice-command-to-action module living in CS. In M8 the mapper moves to the Juke Voice Assistant app; CS keeps a typed action surface. |
 | Name matching | Case-insensitive, punctuation-normalized, best unique match (exact > prefix > containment). Ambiguity is reported as not found. | Tolerates recognition errors without picking wrong items. |
 | Wake word | Always listening while the browse page is open. | Matches the spec. |
 | Scope | Browse view only for milestones 1–4. Later milestones will add voice integration with Juke Operator and Juke Translator, so the command registry must be extensible and the widget must be mountable in wizard mode later. | User clarification. |
@@ -571,7 +572,86 @@ Remaining open points: whether the operator's default instructions (`$config.ins
 voice-driven generation (assume yes), and the exact wording of the generation prompt template so the model
 returns one value per requested path.
 
-## 6. Non-goals (milestones 1–4)
+### Milestone 8 — Juke Voice Assistant application (planned 2026-09-16)
+
+Goal: everything built in milestones 1–7 ships as a separate XP application, "Juke Voice Assistant", next to Juke
+Content Operator and Juke Translator. Installing and starting it enables the voice features in Content Studio;
+without it Content Studio has none. The Content Studio side of this milestone is meant to be mergeable into the
+real Content Studio (`com.enonic.app.contentstudio`), not just the hackathon fork.
+
+Naming and location (to confirm with the user before starting):
+- Application key `com.enonic.app.ai.voiceassistant`, title "Juke Voice Assistant", vendor Enonic AS
+  (`application.yaml` like the operator's).
+- Repository `/Users/ase/dev/app-ai-voice-assistant`, cloned from the operator's skeleton: Gradle
+  (`build.gradle.kts`, `gradle.properties` with `appName`, XP `8.1.0-SNAPSHOT`), Vite + Preact client bundle at
+  `assets/index.js`, esbuild server bundle, vitest, i18n `phrases.properties`.
+- Plugin id `ai.voiceAssistant` added to `AiPluginId` in `ai-protocol.ts` (protocol version bump; the mirrors in
+  the operator, translator and the new app stay byte-identical).
+
+How the other Juke apps plug in today (`modules/app/.../admin/tools/main/main.js`, `main.html`, `lib/ai.js`,
+`v6/features/ai/ai.host.ts`): the tool controller checks `appLib.get({key}).started`, passes the app's asset URL
+to `main.html`, which seeds `window.Enonic.AI` and adds an async `<script src=".../index.js">` with the CSP nonce;
+the bundle calls `window.Enonic.AI.register({ id, version, mount })`; the host mounts it into a container it
+creates and fans `content/schema/language/config` signals out through the `AiPluginApi`. Juke Voice Assistant
+uses the same path.
+
+Where the line goes (the app is the thick side):
+- **App (Juke Voice Assistant)** owns everything that is about voice: recognizer, speaker, echo filter, normalizer,
+  command registry, every command's *phrase parsing* and dialog state (prompts, create/search/action flows),
+  spoken replies and their phrases, the widget (rendered by the plugin into its container, shadow DOM like the
+  operator's dialog, fixed bottom-right), the cross-tab BroadcastChannel and the hand-over/hand-back logic, the
+  `juke=1` marker convention, and the availability rules (speech support, browse or handed-over editor). It
+  reaches Content Studio only through the voice host API below and, for M6/M7, through the AI host's routed
+  commands (`generate:fields`, `translate:fields`).
+- **Content Studio** owns a **voice host API**: a typed, versioned capability surface in `ai-protocol.ts`
+  (section "Voice host") implemented in `v6/features/ai` (or a sibling `features/voice-host`) by thin adapters
+  over the stores and APIs the commands call today. It is passed to the plugin in `AiPluginContext` (a new
+  `context.voice` object, only present for `ai.voiceAssistant`). Content Studio also keeps the load hooks
+  (`lib/ai.js` `aiVoiceAssistantRunning()`, `main.js` params, `main.html` script tag, `isAiEnabled` including
+  the voice app in both views), the editor bridge in `main.ts` (now feeding the host API instead of the feature),
+  and the extension points the commands need but the UI does not expose yet (e.g. `revealContentByPath` options
+  added in M2, `waitForMovedEvent` semantics, hit-count parity helpers).
+
+Voice host API (derived from the action halves of the current commands; each is one method with plain data in
+and out, no CS classes cross the boundary):
+- Session/context: `getUser()` (display name), `getMode()` (`browse` | `wizard`), `isPluginRegistered(id)` (for
+  M6/M7 replies like "the operator is not installed"), `notify(level, message)`, `i18n(key, ...args)` for CS
+  toasts the commands reuse (`dialog.archive.success.*`, `notify.items.moved.to.*`, ...).
+- Projects: `listProjects()`, `switchProject(name)`.
+- Tree: `getVisibleNodes()` (id, displayName, name, hasChildren, expanded, level), `expandNode(id)`,
+  `collapseNode(id)`, `getSelection()`, `revealPath(path, { expandTarget })`, `leaveFilterMode()`.
+- Content: `findContentByName(name, { canHoldChildren, excludeIds, excludePaths })` returning candidates with
+  labels and paths (matching stays in the app), `getCreatableTypes(parentId?)`, `createContent(type, parentPath,
+  displayName)` (name generation and uniqueness inside CS), `archive(ids)`, `move(ids, destinationPath)`,
+  `duplicate(ids, withChildren)` (all awaiting task completion and the socket report where relevant), `preview(ids)`,
+  `openEditTab(id, { displayAsNew, marker })` returning a closed-state handle.
+- Search: `search(criteria)` → hit count (criteria as plain data: keywords, content types, modifier, last
+  modified range, workflow), `applySearch(criteria)`, `setFilterPanelOpen(open)`, `listContentTypes()`,
+  `listRecentEditors()`.
+- Editor: `hasUnsavedChanges()`, `save()`, `close()`; M6/M7 go through the routed AI commands.
+
+Steps:
+1. Carve the API: split each command file into parse (stays) and action (moves behind an interface) inside CS
+   first, with the existing tests green, so the boundary is proven before anything moves.
+2. Add the protocol types and the CS implementation; pass `context.voice` to the voice plugin; add the load hooks.
+3. Scaffold the app repo; move `features/juke` (speech, commands' parse halves, model, ui, tests) into it; port the
+   widget to the plugin container; move `juke.*` phrases to the app's i18n; wire `register`/`mount`/`dispose`.
+4. Delete `features/juke` from CS; keep only the host API and hooks. Restore `hackathonTestsOnly=false` so CS's
+   full suite runs again.
+5. Re-verify every milestone by voice in Chrome with the three Juke apps installed; fix regressions.
+
+Risks specific to this milestone: the plugin bundle cannot import Content Studio modules, so any command detail
+that still leans on CS internals (e.g. `ContentTypesHelper`, filter-panel query builders, `NamePrettyfier`) must be
+covered by the API or reimplemented; version coupling between CS and the app is handled by the protocol version;
+CSP nonce and same-origin rules already cover script loading, BroadcastChannel and the microphone; the editor
+bridge and hand-over marker become part of the API contract.
+
+Acceptance: with Juke Voice Assistant stopped, Content Studio shows no widget, asks for no microphone and has no
+`[juke]` console output; started, every acceptance scenario of milestones 1–7 passes by voice; the operator and
+translator are only needed for M6/M7 commands and their absence is spoken, not silent; the app builds and tests on
+its own; the Content Studio diff against `master` contains only the host API, hooks and protocol changes.
+
+## 6. Non-goals (milestones 1–5)
 
 - No LLM, no MCP, no server-side speech processing, no new server endpoints.
 - No wizard/editor tab support (lifted in M5).
@@ -618,3 +698,31 @@ Branch: `juke-voice`. Verify each step with `pnpm -C ./modules/lib run check` an
 8. **Milestone 7** (commit "Translate fields with Juke Translator by voice")
    - Language resolver, `translate:fields` protocol command, translator side in app-ai-translator; phrases;
      tests.
+9. **Milestone 8** (several commits in CS: "Add the voice host API for Juke Voice Assistant", "Load Juke Voice
+   Assistant as an AI plugin", "Remove the built-in Juke feature"; app repo: "Initial Juke Voice Assistant")
+   - Parse/action split behind an interface, protocol types, CS implementation and load hooks, app scaffold,
+     move of `features/juke`, deletion from CS, full re-verification.
+
+## 9. Estimates
+
+Measured on this session for milestones 1–5 (branch `juke-voice`, 2026-09-10 to 2026-09-15): about 10 hours of
+active session time over 5 days, 64 commits, about 75 user messages, about 980 assistant turns, 3.3k lines of
+feature code plus 3.5k lines of tests, roughly 400–500k output tokens and 80–120M input tokens processed (nearly
+all cached context re-reads; about 200k tokens of fresh input). An up-front estimate from the PRD alone would
+have been 2–3× too low; the difference was field testing by voice (recognition quirks, browser constraints) and
+scope changes made on the way.
+
+Estimates for the remaining milestones, using the same yardstick (active session time, commits, tokens processed
+incl. cached re-reads; each assumes the same review-between-steps way of working and a similar share of
+by-voice verification):
+
+| Milestone | Active time | Commits | Tokens processed | Notes |
+|---|---|---|---|---|
+| 6 — Operator suggestions | 3–4 h | 10–14 | 25–35M | Two repos, protocol command, headless generation path in the operator, field-label matching. |
+| 7 — Translator | 2–3 h | 8–12 | 20–30M | Same shape as M6, less new ground; save-first constraint. |
+| 8 — Juke Voice Assistant app | 10–14 h | 40–60 | 90–130M | Parse/action split of ~3.3k lines and ~3.5k test lines, ~40-method host API, new repo and build, load hooks, full regression pass by voice across M1–7. About the size of M1–5 together. |
+| Total M6–M8 | 15–21 h | 60–85 | 135–195M | |
+
+The M8 estimate assumes the app repo is cloned from the operator's skeleton and that the host API is carved
+inside CS first (step 1), which keeps every existing test green while the boundary is drawn; doing the move
+before the split would roughly double the regression work.
