@@ -731,6 +731,23 @@ Whole project (measured M1–5 plus estimated M6–8):
 | Milestones 6–8 (estimated) | 15–21 h | 6–9 working days at the same pace | 60–85 | 0.6–0.9M | 135–195M |
 | Entire project | 25–31 h | 11–14 working days | 125–150 | 1.0–1.4M | 215–315M |
 
+Clean-room estimate (starting from scratch today with everything known: the design, the browser pitfalls and the
+final scope, built straight through with the app architecture of M8 from day one instead of an extraction, no
+review gaps, no scope changes, one by-voice verification pass per milestone that finds nothing):
+
+| Phase | Agent time | Tokens processed |
+|---|---|---|
+| Host API in CS + Juke Voice Assistant scaffold (M8 as architecture) | 3–4 h | 25–35M |
+| Voice session, echo filtering, widget, commands of M1–5 (parse side in the app, actions behind the API) | 4–5 h | 35–50M |
+| Operator and translator integration (M6–7) | 2–3 h | 15–25M |
+| Verification passes and phrase tuning | 1–2 h | 5–10M |
+| Total | 10–14 h, about two working days | 80–120M (output ~0.5–0.7M) |
+
+That is roughly a third of the path-dependent total above. The gap is not typing speed but discovery: two echo
+filter redesigns, the recognition-quirk cycles, the app-rename side effects, the Chrome single-session rule, the
+move-event race and the milestone revisions, plus the extraction itself, which a from-scratch build avoids by
+starting in the app.
+
 Calendar time assumes the pace so far: about two hours of session time per working day, with the user testing
 by voice between steps. Compressed to full days the same work fits in about four to five working days. Had this
 estimate been made from the PRD before implementation started, with today's knowledge of the voice testing loop
